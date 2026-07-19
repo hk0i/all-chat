@@ -6,21 +6,27 @@
 
 ## 1. Overview
 
-All Chat is a web app for streamers who broadcast to multiple platforms simultaneously. It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with a grid view of per-platform chats as a secondary display mode, and first-class OBS integration (dockable panel + on-stream overlay).
+All Chat is a self-hosted web app for streamers who broadcast to multiple platforms simultaneously (e.g. via [Restreamer](https://datarhei.github.io/restreamer/) or similar multistreaming setups). It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with a grid view of per-platform chats as a secondary display mode, and first-class OBS integration (dockable panel + on-stream overlay). It is the chat-side companion to a video-side multistream stack: same deployment shape (a Docker container on the streamer's box), zero platform logins.
+
+Streams are organized into **profiles** — named groups of chat sources matching how a streamer actually goes live. A "Gaming" profile might contain `twitch/gmpekk`, `kick/gmpekk`, and `youtube/@gmpekk`; a "Game Dev" profile might contain `twitch/gmpekk`, `twitch/gmpekk`, and `youtube/@smallindie`. A profile is an **array of sources, not a platform→channel map**: the same platform can appear any number of times.
 
 The app is read-only in v1: it displays messages but cannot send them. This keeps the MVP free of login/auth flows — every supported platform has an anonymous read path.
+
+**Scale assumption:** self-hosted, one streamer (plus their OBS instances and maybe a phone) per deployment. Single-digit concurrent clients, a handful of upstream connections. No horizontal scaling, no external datastore — in-process state and a JSON file cover it.
 
 ### Design principles
 
 - **One app, one container.** A single SvelteKit application serves the UI and all server-side ingestion. Deployed as a Docker image on the streamer's machine, LAN, or cloud.
 - **API-first: all ingestion server-side, clients are thin.** The server connects to every platform and exposes one unified SSE stream of normalized messages. The web UI, OBS dock, OBS overlay, and any future native mobile client are all equal consumers of the same endpoint — the message schema is a versioned API contract, and nothing in it is SvelteKit-specific. One upstream connection per platform+channel (refcounted), fanned out to any number of clients.
-- **Everything is a URL.** Channel config, view mode, and overlay styling ride URL params, so any view can be bookmarked, shared, docked into OBS, or used as a browser source with zero extra setup.
-- **No accounts, no secrets.** v1 stores nothing but the user's channel list (localStorage / URL params).
+- **Everything is a URL.** Profile, view mode, and overlay styling ride URL params (`/?profile=gaming&overlay=1`), so any view can be bookmarked, shared, docked into OBS, or used as a browser source with zero extra setup.
+- **Profiles are server-side state.** Stored in a JSON file on a Docker volume — stable across restarts, shared by every client, editable from any of them. localStorage holds only per-device UI preferences.
+- **No accounts, no secrets.** v1 stores nothing but profiles (names + public channel identifiers).
 
 ## 2. Goals / Non-goals
 
 ### Goals (v1)
 
+- Stream profiles: named source groups, any mix of platforms, duplicates allowed; create/edit/switch in the UI.
 - Unified single-window feed merging live chat from Twitch, Kick, and YouTube.
 - Grid view: each platform's chat in its own panel, split evenly.
 - OBS integration:
@@ -69,12 +75,25 @@ The watch page's own chat uses InnerTube's `youtubei/v1/live_chat/get_live_chat`
 
 ### 3.4 API surface (SvelteKit server routes, consumable by any client)
 
-- `GET /api/chat/stream?twitch=<ch>&kick=<ch>&youtube=<input>` — **the** endpoint: unified SSE stream (`text/event-stream`) of normalized `ChatMessage` JSON from every requested platform, plus `status` events per source (connecting / live / reconnecting / failed). Any subset of params. Config is per-request — no server-side session.
+**Chat stream:**
+
+- `GET /api/chat/stream?profile=<idOrName>` — **the** endpoint: unified SSE stream (`text/event-stream`) of normalized `ChatMessage` JSON from every source in the profile, plus `status` events per source (connecting / live / reconnecting / failed). Events tag the originating `sourceId`, so clients can tell apart two sources on the same platform.
+- Ad-hoc form (no profile needed): `GET /api/chat/stream?source=twitch:gmpekk&source=twitch:gmpekk&source=youtube:@smallindie` — repeated `source=platform:channel` params, duplicates of a platform welcome.
+
+**Profiles (CRUD):**
+
+- `GET /api/profiles` — list.
+- `POST /api/profiles` — create `{ name, sources: SourceConfig[] }`.
+- `PUT /api/profiles/[id]` / `DELETE /api/profiles/[id]`.
+- Persisted to `/data/profiles.json` (Docker volume). Writes are atomic (write-temp-then-rename); at this scale a JSON file is the right database.
+
+**Helpers:**
+
 - `GET /api/youtube/resolve/[input]` — URL/ID/handle → live video ID (also used internally by the stream route).
 - `GET /api/kick/channel/[slug]` — chatroom ID lookup (cached; exposed for the manual-fallback UX).
 - `GET /api/health` — liveness.
 
-Stateless, no credentials. Upstream connections are keyed by platform+channel and refcounted: the first client subscribing to a channel opens the upstream connection, later clients share it, and it closes when the last client detaches. SSE (not WebSocket) because the v1 flow is one-way, it fits SvelteKit routes natively, and every mobile HTTP stack speaks it; v2 message-sending will use plain POST endpoints alongside the stream.
+No credentials anywhere. Upstream connections are keyed by platform+channel and refcounted: the first subscriber to a source opens the upstream connection, later subscribers share it — including across profiles (two profiles containing `twitch/gmpekk` share one IRC connection). If the same source appears twice within one profile, it is deduplicated at connection level and delivered once. SSE (not WebSocket) because the v1 flow is one-way, it fits SvelteKit routes natively, and every mobile HTTP stack speaks it; v2 message-sending will use plain POST endpoints alongside the stream.
 
 ## 4. Architecture
 
@@ -102,8 +121,22 @@ flowchart LR
 ### 4.1 Normalized message model
 
 ```ts
+interface Profile {
+  id: string;              // stable slug, generated from name
+  name: string;            // "Gaming", "Game Dev"
+  sources: SourceConfig[]; // ordered array — same platform may repeat
+}
+
+interface SourceConfig {
+  id: string;              // stable per-source id (used in ChatMessage.sourceId)
+  platform: 'twitch' | 'kick' | 'youtube';
+  channel: string;         // twitch/kick channel slug, or youtube URL/ID/@handle
+  label?: string;          // optional display name ("Main Twitch", "Indie YT")
+}
+
 interface ChatMessage {
   id: string;            // platform message id, or synthesized
+  sourceId: string;      // which SourceConfig produced this message
   platform: 'twitch' | 'kick' | 'youtube';
   channel: string;       // channel the message came from
   timestamp: number;     // epoch ms (arrival time if platform omits it)
@@ -127,15 +160,15 @@ This schema is the API contract for all clients (web, OBS, future mobile). Wire 
 ### 4.2 Unified feed behavior
 
 - Messages append in arrival order (not timestamp-sorted — re-sorting causes visual jumping).
-- Each message shows a platform icon + platform accent color stripe.
+- Each message shows a platform icon + platform accent color stripe; when a profile contains multiple sources on the same platform, the source label (or channel name) is shown too, so `twitch/gmpekk` and `twitch/gmpekk` are distinguishable at a glance.
 - Auto-scroll with "paused — N new messages" pill when the user scrolls up.
 - Ring buffer caps retained messages (default 1,000) to bound memory during long streams.
 - High-throughput safety: batch DOM appends per animation frame; virtualize if needed.
 
 ### 4.3 Grid view
 
-- CSS grid, evenly split among active platforms (1–3 panes in v1).
-- Panes reuse the same feed component, filtered to one platform — consistent styling, no iframes, no embed restrictions.
+- CSS grid, evenly split among the profile's sources — **one pane per source**, not per platform (a profile with two Twitch channels gets two Twitch panes).
+- Panes reuse the same feed component, filtered by `sourceId` — consistent styling, no iframes, no embed restrictions.
 - View toggle (Unified ⇄ Grid) in the header; choice persisted.
 
 ### 4.4 OBS integration (MVP)
@@ -143,14 +176,16 @@ This schema is the API contract for all clients (web, OBS, future mobile). Wire 
 Both shapes are plain URLs into the same app:
 
 - **Custom browser dock (panel in OBS):** OBS → Docks → Custom Browser Docks → paste app URL. Full interactive app (unified or grid) inside the OBS window. Nothing special required beyond sane behavior at narrow widths — responsive layout is a v1 requirement.
-- **Browser source overlay (on stream):** `/?overlay=1&twitch=foo&kick=bar&youtube=baz`. Overlay mode: transparent background, no chrome (no header/inputs), larger text with stroke/shadow for readability, optional per-message fade-out (`&fade=20` seconds). OBS browser sources support transparency natively.
+- **Browser source overlay (on stream):** `/?profile=gaming&overlay=1`. Overlay mode: transparent background, no chrome (no header/inputs), larger text with stroke/shadow for readability, optional per-message fade-out (`&fade=20` seconds). OBS browser sources support transparency natively.
 
-URL params carry the complete config (`?twitch=...&kick=...&youtube=...&view=unified|grid&overlay=1&fade=N`), so docks and sources survive OBS restarts with no server-side session.
+URL params reference a profile plus view options (`?profile=<idOrName>&view=unified|grid&overlay=1&fade=N`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
 
 ### 4.5 Configuration & persistence
 
-- Setup screen: one input per platform (Twitch channel, Kick channel, YouTube URL/ID/handle). Any subset may be filled.
-- Config persists to `localStorage` and is reflected into URL params; a "copy OBS URLs" helper emits ready-made dock/overlay links.
+- Profile manager screen: create/rename/delete profiles; within a profile, add/remove/reorder sources (platform picker + channel input + optional label). Adding a second source of the same platform is a normal, unremarkable action.
+- Profiles persist server-side (`/data/profiles.json`, §3.4). localStorage holds only per-device preferences (last-used profile, view mode).
+- A "copy OBS URLs" helper emits ready-made dock/overlay links for the selected profile.
+- Restreamer users: the expectation is one profile per way-you-go-live, mirroring the output groups configured in the video stack.
 
 ## 5. Tech stack
 
@@ -182,10 +217,10 @@ URL params carry the complete config (`?twitch=...&kick=...&youtube=...&view=uni
 **Primary: Docker image** (GHCR), run on the streamer's machine, home server/LAN, or any cloud host:
 
 ```sh
-docker run -p 8420:3000 ghcr.io/<owner>/all-chat
+docker run -p 8420:3000 -v allchat-data:/data ghcr.io/<owner>/all-chat
 ```
 
-Then `http://localhost:8420` (or the LAN/cloud host) in a browser and in OBS dock/source URLs.
+Then `http://localhost:8420` (or the LAN/cloud host) in a browser and in OBS dock/source URLs. The `/data` volume holds `profiles.json`. Drops straight into a `docker-compose.yml` next to Restreamer; a sample compose file ships in the repo.
 
 Also runs bare with Node (`npm run build && node build/`) for non-Docker users.
 
