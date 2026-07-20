@@ -65,7 +65,7 @@ Display options ride the query string on any of the above:
 | `icons=0` | on | Hide platform icons + accent stripe |
 | `avatars=0` / `avatars=1` | on (dock), off (overlay) | Author avatars / colored-initial discs |
 | `overlay=1` | off | Transparent, chrome-less, larger stroked text — OBS **browser source** |
-| `fade=N` | unset | In overlay mode, evict a message N seconds after it arrives |
+| `fade=N` | 10s (overlay only) | Evict a message N seconds after it arrives; `fade=0` disables eviction |
 
 ## Develop
 

@@ -12,6 +12,14 @@
 
 	const MAX_MESSAGES = 1000;
 
+	/**
+	 * Default `fade` when overlay mode doesn't specify one — an overlay left
+	 * running for hours shouldn't pile up messages forever on stream.
+	 * Hardcoded for now; a future settings screen should expose this instead
+	 * of requiring a query param (EDD §10).
+	 */
+	const DEFAULT_OVERLAY_FADE_SECONDS = 10;
+
 	/** How close to the bottom (px) still counts as "at the bottom". */
 	const STICK_THRESHOLD_PX = 40;
 
@@ -50,10 +58,9 @@
 	let overlayMode = $state(false);
 
 	/**
-	 * `&fade=N` — seconds a message stays before it's evicted from the feed,
-	 * so an overlay left running for hours doesn't pile up forever on
-	 * stream. Unset outside overlay use; messages live until MAX_MESSAGES
-	 * pushes them out instead.
+	 * Seconds a message stays before it's evicted from the feed. Defaults on
+	 * in overlay mode (DEFAULT_OVERLAY_FADE_SECONDS), off otherwise; `&fade=N`
+	 * overrides either way, and `&fade=0` disables eviction even in overlay.
 	 */
 	let fadeSeconds = $state<number | undefined>();
 	/** message id → receipt time (ms); drives the fade-eviction sweep. */
@@ -151,11 +158,13 @@
 			? params.get('avatars') !== '0'
 			: params.get('overlay') !== '1';
 
-		const fadeParam = Number(params.get('fade'));
-		if (params.has('fade') && Number.isFinite(fadeParam) && fadeParam > 0) {
-			fadeSeconds = fadeParam;
-			fadeSweepHandle = setInterval(sweepExpired, 1000);
+		if (params.has('fade')) {
+			const fadeParam = Number(params.get('fade'));
+			if (Number.isFinite(fadeParam) && fadeParam > 0) fadeSeconds = fadeParam;
+		} else if (overlayMode) {
+			fadeSeconds = DEFAULT_OVERLAY_FADE_SECONDS;
 		}
+		if (fadeSeconds !== undefined) fadeSweepHandle = setInterval(sweepExpired, 1000);
 
 		hasParams = params.has('profile') || params.has('source');
 		let closeStream: (() => void) | undefined;

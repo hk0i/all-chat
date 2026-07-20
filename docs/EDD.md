@@ -368,7 +368,7 @@ v1 ships the hooks so this bolts on without restructuring:
 
 - **v1 (this doc):** read-only unified feed, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
 - **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD); Twitch/Kick avatar enrichment (server-side lookup + cache, §4.1); real Twitch badge icons via `badges.twitch.tv/v1/badges/global/display` (global set, no auth) and Helix per-channel custom sub badges (needs a registered Client-ID, so gated on this v2 auth work) — replaces the text-pill/dropped-unknown scheme in the UI (§3, `BadgeStrip`); server-side LRU cache keyed by set/version (global) and broadcaster id (per-channel) so badge lookups aren't refetched per connection.
-- **Later:** chatbot as a separate service consuming the API (§9); native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
+- **Later:** chatbot as a separate service consuming the API (§9); native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming; a settings screen exposing overlay display defaults (fade duration, message animation style) that are currently hardcoded/query-param-only.
 
 ## 9. Ecosystem: chatbot and other integrations
 
@@ -421,7 +421,7 @@ Open source from the first commit. Structure chosen so the copyleft core can nev
 
 ## 10. Open questions
 
-1. Overlay styling surface for v1: just size/fade params, or a small theme editor? Leaning params-only; theming is a rabbit hole.
+1. ~~Overlay styling surface for v1: just size/fade params, or a small theme editor?~~ Resolved: params-only for v1 (`fade`, defaulted in overlay mode — §8 roadmap), a settings screen is deferred.
 2. YouTube poller sharing: refcount per video is designed in — is multi-client (streamer's browser + OBS dock + overlay all connected at once) the common case? Yes, likely three concurrent clients; SSE fan-out from one poller handles it.
 3. Docker image publishing cadence: tag-based releases vs every-main-commit `:edge`. Proposal: both.
 
