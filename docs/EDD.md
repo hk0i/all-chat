@@ -70,6 +70,8 @@ References: [Twitch IRC docs](https://dev.twitch.tv/docs/chat/irc/) (message for
 
 Risk: unofficial API; Kick has churned the Pusher key/cluster before. All Kick constants isolated in one module (`web/src/lib/server/sources/kick/constants.ts`); breakage treated as expected maintenance. The Pusher key is public (every kick.com visitor's browser receives it); when it rotates, re-derive it from kick.com via browser DevTools → Network → WS filter → the `wss://ws-<cluster>.pusher.com/app/<key>?protocol=7` connection URL, and cross-check against community Kick client libraries on GitHub, which track rotations quickly.
 
+Because rotation is expected maintenance, the key and cluster host are overridable without a code change via `KICK_PUSHER_KEY` / `KICK_PUSHER_HOST` environment variables (set in the container env, restart to apply — see `.env.example`). A control-panel setting (stored in `/data/config.json`) is planned for v2 once the §6.1 auth exists; exposing runtime config mutation on an unauthenticated deployment would let anyone on the network repoint the connection.
+
 ### 3.3 YouTube
 
 The watch page's own chat uses InnerTube's `youtubei/v1/live_chat/get_live_chat` — no API key or quota:

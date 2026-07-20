@@ -10,6 +10,10 @@ services:
     environment:
       VIRTUAL_HOST: ${ALLCHAT_HOST:-all-chat.localhost}
       VIRTUAL_PORT: "3000"
+      # Kick rotates its public Pusher key occasionally; override without a
+      # code change (see docs/EDD.md §3.2). Empty = use built-in defaults.
+      KICK_PUSHER_KEY: ${KICK_PUSHER_KEY:-}
+      KICK_PUSHER_HOST: ${KICK_PUSHER_HOST:-}
     volumes:
       - allchat-data:/data
     networks:
