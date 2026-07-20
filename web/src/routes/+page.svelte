@@ -17,6 +17,10 @@
 	let messages = $state<ChatMessage[]>([]);
 	let statuses = $state<Record<string, StatusEvent>>({});
 	let connected = $state(false);
+	/** Whether ?profile= or ?source= was passed at all — distinguishes "nothing to connect to" from a real failure below. */
+	let hasParams = $state(false);
+	/** Set when the stream connection fails permanently (see stream.ts onError). */
+	let streamError = $state<string | undefined>();
 
 	/**
 	 * Platform icons + accent stripes, on by default; `&icons=0` disables
@@ -113,7 +117,8 @@
 		showAvatars = params.has('avatars')
 			? params.get('avatars') !== '0'
 			: params.get('overlay') !== '1';
-		if (!params.has('profile') && !params.has('source')) return;
+		hasParams = params.has('profile') || params.has('source');
+		if (!hasParams) return;
 
 		const close = openChatStream(params.toString(), {
 			onHello: () => (connected = true),
@@ -124,7 +129,10 @@
 			onStatus: (status) => {
 				statuses = { ...statuses, [status.sourceId]: status };
 			},
-			onError: () => (connected = false)
+			onError: (message) => {
+				connected = false;
+				streamError = message;
+			}
 		});
 		return () => {
 			close();
@@ -151,10 +159,12 @@
 		</div>
 	</header>
 
-	{#if !connected && messages.length === 0}
+	{#if streamError}
+		<p class="error-banner" role="alert">Couldn't connect: {streamError}</p>
+	{:else if !hasParams}
 		<p class="hint">
 			Pass <code>?source=twitch:somechannel</code> (repeatable) or <code>?profile=name</code> to
-			connect. Scaffold build — sources are fakes until platform ingestion lands.
+			connect.
 		</p>
 	{/if}
 
@@ -270,6 +280,13 @@
 
 	.hint {
 		color: var(--text-muted);
+	}
+
+	.error-banner {
+		color: var(--status-failed);
+		border: 1px solid var(--status-failed);
+		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
 	}
 
 	.feed-wrap {
