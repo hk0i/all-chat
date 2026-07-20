@@ -173,7 +173,7 @@ Handling:
 - `avatarUrl`: optional by design. v1 populates it for YouTube only (free in the payload). Twitch/Kick avatar **enrichment** is v2: a server-side per-user lookup with an [LRU](#def-lru)+[TTL](#def-ttl) cache — Twitch via Helix once platform OAuth exists, Kick via its profile API (same Cloudflare caveats as the channel lookup). The field exists in the contract from day one so enrichment changes no schema.
 - Renderers must treat `avatarUrl` as absent-friendly: fallback is a colored-initial disc (using `author.color`), so a mixed feed (YouTube with photos, Twitch/Kick with discs) stays visually coherent.
 
-This schema is the API contract for all clients (web, OBS, future mobile). Wire format is JSON over SSE; the stream is versioned via an `X-AllChat-API` response header and an initial `hello` event carrying `{ apiVersion }`, so native clients can detect drift. Types live in `src/lib/types.ts` and are the single source of truth; if a native client materializes, they export cleanly to a small shared package.
+This schema is the API contract for all clients (web, OBS, future mobile). Wire format is JSON over SSE; the stream is versioned via an `X-AllChat-API` response header and an initial `hello` event carrying `{ apiVersion }`, so native clients can detect drift. Types live in `shared/contract/` (§5) and are the single source of truth for the server, the web UI, and — via JSON Schema codegen — the native mobile apps.
 
 ### 4.2 Unified feed behavior
 
@@ -218,28 +218,34 @@ Evaluated for minimal system requirements, considered and settled:
 - **Protobuf** — rejected. [SSE](#def-sse) is a text protocol and the browser `EventSource` consumes JSON natively; protobuf would mean base64-wrapped binary over a text stream. Message volume makes serialization overhead immaterial, and JSON keeps the API curl-debuggable and trivially consumable by homebrew bot plugins (§9.2).
 - **Mobile type sharing (SwiftUI first, then Android):** contract-first via JSON Schema. `types.ts` remains the source of truth; JSON Schema is generated from it (e.g. `ts-json-schema-generator`), and Swift `Codable` structs are generated from the schema (quicktype) at mobile kickoff — same path later for Kotlin. Wire-format versioning already exists (`apiVersion` in the `hello` event, §4.1).
 - **Footprint work that is free and kept:** multi-stage Docker build, distroless or alpine Node base image, production-pruned dependencies, single process. Targets: image < 150 MB, idle RSS < 150 MB. Escape hatch if performance ever actually hurts: swap the runtime to Bun (drop-in experiment) before considering any rewrite.
-- **Repo layout:**
+- **Repo layout — monorepo.** All Chat is one repository holding every first-party piece of the product: the gateway app now, the native mobile apps later. One tag versions everything; the whole project clones in one pull. The SvelteKit app is deliberately **not** split into `backend/` + `web/` — the fused UI+API app is the design (one container, §5.1); it lives as a single top-level unit named for what it is:
   ```
   all-chat/
-    docs/                 # this doc
-    src/
-      lib/
-        types.ts          # ChatMessage etc. — the API contract
-        server/
-          sources/        # ChatSource impls: twitch.ts, kick.ts, youtube.ts
-          manager.ts      # refcounted source registry + SSE fan-out
-        stream.ts         # client-side SSE consumer + feed state
-        components/
-          feed/           # Feed, MessageRow, BadgeStrip, EmoteFragment, AvatarDisc, ...
-          profiles/       # ProfileManager, ProfileEditor, SourceRow, ObsUrlHelper
-          ui/             # shared primitives: Icon, Toggle, StatusDot
-      routes/
-        +page.svelte      # main app (unified feed; overlay is a display variant)
-        api/...           # API routes (§3.4)
-    static/
-    Dockerfile            # multi-stage: build → slim node runtime
-    .github/workflows/    # CI: check, test, build, publish image to GHCR
+    docs/                   # any engineering (development) or user-facing documentation
+    shared/
+      contract/             # types.ts + generated JSON Schema — the API contract (MIT, §9.4)
+    web/                    # SvelteKit gateway: web UI + API server, one deployable (GPL-3.0)
+      src/
+        lib/
+          server/
+            sources/        # ChatSource impls: twitch.ts, kick.ts, youtube.ts
+            manager.ts      # refcounted source registry + SSE fan-out
+          stream.ts         # client-side SSE consumer + feed state
+          components/
+            feed/           # Feed, MessageRow, BadgeStrip, EmoteFragment, AvatarDisc, ...
+            profiles/       # ProfileManager, ProfileEditor, SourceRow, ObsUrlHelper
+            ui/             # shared primitives: Icon, Toggle, StatusDot
+        routes/
+          +page.svelte      # main app (unified feed; overlay is a display variant)
+          api/...           # API routes (§3.4)
+      static/
+    ios/                    # SwiftUI app (later; MIT, own repo tooling — Xcode)
+    android/                # Kotlin app (later; MIT — Gradle)
+    Dockerfile              # builds web/ → slim node runtime
+    .github/workflows/      # CI: check, test, build, publish image to GHCR
   ```
+  Naming notes: `web/` holds the fused UI+API gateway — the API is part of the web deployable by design (§5.1), so no separate `backend/` exists. `shared/` holds code consumed by more than one platform directory; `contract/` is its first member (future candidates: emote-parsing rules, badge normalization tables).
+- **Monorepo mechanics:** npm workspaces span `web/` + `shared/contract/`; `web/` imports contract types directly (compile-time sharing preserved). `ios/` and `android/` are native-toolchain directories, not workspace members — they consume the contract via a committed codegen step (quicktype over the JSON Schema emits Swift `Codable`/Kotlin into each app's source tree), so contract drift shows up as a diff in the same PR that changed the contract. Per-directory licensing (§9.4) maps onto this layout one-to-one.
 ### 5.2 Color palette & design tokens
 
 Source of truth: the [onebigfunction-library Figma file](https://www.figma.com/design/19qUm3VYRFgzSBZr35vxzW/onebigfunction-library?node-id=312-3) (private — the link is a provenance pointer, not access; keep the file's sharing set to invite-only, and all values are exported below so this doc stands alone) — a palette loosely based on [Tango](https://en.wikipedia.org/wiki/Tango_Desktop_Project). Values below were exported from Figma variables and become CSS custom properties in a single `tokens.css`.
@@ -367,6 +373,16 @@ Already in the v1 design, listed here as commitments:
 - SSE stream is multi-consumer (refcounted fan-out) — N integrations cost nothing extra upstream.
 - The message schema is versioned (`hello` event / `X-AllChat-API` header, §4.1) — integrations detect drift instead of silently breaking.
 - Bearer tokens are per-client and scoped (§6.1) — each integration gets its own revocable credential.
+
+### 9.4 Licensing
+
+Open source from the first commit. Structure chosen so the copyleft core can never impede clients or the plugin ecosystem:
+
+- **This repo (server + web app): GPL-3.0-only.** Copyleft protects the core product.
+- **API contract artifacts (`shared/contract/` — `types.ts` and the JSON Schema generated from it): MIT**, via a per-directory license notice. Client authors in any language embed generated types (Swift `Codable`, Kotlin, etc.) under any license, no GPL questions. This is what "mobile clients can connect" needs — and note it is guaranteed even without the MIT carve-out: **GPL propagates through code derivation, not network connection.** A client speaking HTTP/SSE to a GPL server is not a derivative work; no dual MIT+GPL license of the whole repo is needed.
+- **Native mobile apps (separate repos, later): MIT.** GPL3 is the wrong license *there* for a practical reason — GPL3's terms conflict with App Store distribution (the VLC precedent). The apps are independent works talking to the API, so their license is independent of the server's.
+- **Bot and its homebrew plugins (§9.2):** bot repo GPL-3.0; user plugins load at runtime as data/configuration in the user's own deployment and are theirs — running private plugins triggers no GPL distribution obligation (GPL obligations attach to distribution, not private use).
+- **Known accepted gap:** plain GPL-3.0 permits hosting a modified All Chat as a network service without publishing changes (the "SaaS loophole"); AGPL-3.0 would close it. For a self-hosted single-streamer tool this is deemed acceptable — revisit before first release if it stops feeling acceptable, since relicensing later requires all contributors' consent.
 
 ## 10. Open questions
 
