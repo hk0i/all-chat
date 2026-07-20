@@ -61,6 +61,8 @@ All ingestion runs server-side. Per-platform mechanics:
 
 Anonymous WebSocket to Twitch IRC: `NICK justinfan12345`, `JOIN #channel`, request tags capability (`CAP REQ :twitch.tv/tags`) for display colors, badges, and emote ranges. Parse PRIVMSG into normalized messages. Reconnect with backoff; answer server PING. The IRC subset is small — minimal hand-rolled parser, no library.
 
+References: [Twitch IRC docs](https://dev.twitch.tv/docs/chat/irc/) (message format, capabilities, tag definitions), [IRCv3 message-tags spec](https://ircv3.net/specs/extensions/message-tags.html) (the `@key=value;…` tag prefix and its escaping rules), RFC 1459 §2.3.1 (base grammar). Sample wire line and its parsed form live in the parser's docstring (`web/src/lib/server/sources/twitch/irc.ts`).
+
 ### 3.2 Kick
 
 1. **Resolve channel → chatroom ID:** `GET https://kick.com/api/v2/channels/{slug}` returns `chatroom.id`. Results cached; on Cloudflare blocks, UI falls back to prompting for a manually entered chatroom ID.

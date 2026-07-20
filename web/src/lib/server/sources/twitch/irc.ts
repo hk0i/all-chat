@@ -1,6 +1,30 @@
 /**
  * Minimal IRCv3 line parser — only what Twitch chat needs (EDD §3.1).
- * Format: [@tags] [:prefix] COMMAND [params] [:trailing]
+ *
+ * Wire format: `[@tags] [:prefix] COMMAND [params] [:trailing]`
+ *
+ * Example — one real chat message as Twitch sends it:
+ *
+ *   @badges=moderator/1;color=#FF4500;display-name=Foo;id=uuid;tmi-sent-ts=1700000000000
+ *     :foo!foo@foo.tmi.twitch.tv PRIVMSG #somechannel :hello world
+ *
+ * (single line on the wire; wrapped here for readability) parses to:
+ *
+ *   {
+ *     tags: { badges: 'moderator/1', color: '#FF4500', 'display-name': 'Foo',
+ *             id: 'uuid', 'tmi-sent-ts': '1700000000000' },
+ *     prefix: 'foo!foo@foo.tmi.twitch.tv',
+ *     command: 'PRIVMSG',
+ *     params: ['#somechannel', 'hello world']
+ *   }
+ *
+ * References:
+ * - Twitch IRC overview:     https://dev.twitch.tv/docs/chat/irc/
+ * - Twitch tag definitions:  https://dev.twitch.tv/docs/chat/irc/#tags
+ * - IRCv3 message-tags spec: https://ircv3.net/specs/extensions/message-tags.html
+ *   (defines the `@key=value;…` prefix and the escaping rules in
+ *   `unescapeTagValue` below)
+ * - Base IRC grammar:        RFC 1459 §2.3.1
  */
 
 export interface IrcLine {

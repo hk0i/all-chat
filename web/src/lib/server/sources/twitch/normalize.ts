@@ -41,9 +41,17 @@ function parseBadges(badgesTag: string | undefined, badgeInfoTag: string | undef
 }
 
 /**
- * Split message text into text/emote fragments using the `emotes` tag
- * (`id:start-end,start-end/id:...`). Twitch ranges index Unicode code
- * points, not UTF-16 units — split to code points first.
+ * Split message text into text/emote fragments using the `emotes` tag.
+ *
+ * Tag format: `id:start-end,start-end/id:start-end` — emote id, then the
+ * character ranges where it appears in the text. Example: for the text
+ * "Kappa hi Kappa", Twitch sends `emotes=25:0-4,9-13`, meaning emote 25
+ * ("Kappa") occupies characters 0-4 and 9-13; character 5-8 (" hi ") stays
+ * text. https://dev.twitch.tv/docs/chat/irc/#emotes-tag
+ *
+ * Twitch ranges index Unicode code points, not UTF-16 units — a single
+ * emoji before an emote shifts JS string indices but not Twitch's — so we
+ * split to code points first.
  */
 function parseFragments(text: string, emotesTag: string | undefined): Fragment[] {
 	if (!emotesTag) return text ? [{ kind: 'text', text }] : [];
