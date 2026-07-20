@@ -142,7 +142,8 @@ interface ChatMessage {
   timestamp: number;     // epoch ms (arrival time if platform omits it)
   author: {
     name: string;
-    color?: string;      // platform-provided or hash-derived
+    color?: string;      // platform-provided or hash-derived (see below)
+    avatarUrl?: string;  // platform-provided when available (see below)
     badges: Badge[];     // normalized: broadcaster, mod, subscriber, verified, ...
   };
   fragments: Fragment[]; // ordered text + emote fragments
@@ -155,12 +156,27 @@ type Fragment =
 
 Emotes render as inline images from each platform's public CDN (all three serve emote images without auth).
 
+**Author color and avatar availability is asymmetric across platforms** (verified):
+
+| | Name color | Avatar in chat payload |
+|---|---|---|
+| Twitch | ✓ IRC `color` tag (user-chosen hex) | ✗ — requires Helix API (OAuth) or third-party lookup |
+| Kick | ✓ `sender.identity.color` hex | ✗ — requires profile lookup |
+| YouTube | ✗ — user name colors don't exist on YouTube chat | ✓ `authorPhoto.thumbnails[]` in every message |
+
+Handling:
+
+- `color`: pass through when the platform provides it; otherwise derive a stable hue from a hash of the author name (YouTube, and Twitch users who never set a color). Merged feed looks uniform either way.
+- `avatarUrl`: optional by design. v1 populates it for YouTube only (free in the payload). Twitch/Kick avatar **enrichment** is v2: a server-side per-user lookup with an LRU+TTL cache — Twitch via Helix once platform OAuth exists, Kick via its profile API (same Cloudflare caveats as the channel lookup). The field exists in the contract from day one so enrichment changes no schema.
+- Renderers must treat `avatarUrl` as absent-friendly: fallback is a colored-initial disc (using `author.color`), so a mixed feed (YouTube with photos, Twitch/Kick with discs) stays visually coherent.
+
 This schema is the API contract for all clients (web, OBS, future mobile). Wire format is JSON over SSE; the stream is versioned via an `X-AllChat-API` response header and an initial `hello` event carrying `{ apiVersion }`, so native clients can detect drift. Types live in `src/lib/types.ts` and are the single source of truth; if a native client materializes, they export cleanly to a small shared package.
 
 ### 4.2 Unified feed behavior
 
 - Messages append in arrival order (not timestamp-sorted — re-sorting causes visual jumping).
 - Each message shows a platform icon + platform accent color stripe; when a profile contains multiple sources on the same platform, the source label (or channel name) is shown too, so `twitch/gmpekk` and `twitch/gmpekk` are distinguishable at a glance.
+- **Avatars are a display option** (UI toggle; `&avatars=1` on overlay URLs): author photo where `avatarUrl` is present, colored-initial disc where it isn't (§4.1). Off by default in overlay mode (visual noise on stream), on by default in the dock/browser.
 - Auto-scroll with "paused — N new messages" pill when the user scrolls up.
 - Ring buffer caps retained messages (default 1,000) to bound memory during long streams.
 - High-throughput safety: batch DOM appends per animation frame; virtualize if needed.
@@ -172,7 +188,7 @@ Both shapes are plain URLs into the same app:
 - **Custom browser dock (panel in OBS):** OBS → Docks → Custom Browser Docks → paste app URL. Full interactive app inside the OBS window. Nothing special required beyond sane behavior at narrow widths — responsive layout is a v1 requirement.
 - **Browser source overlay (on stream):** `/?profile=gaming&overlay=1`. Overlay mode: transparent background, no chrome (no header/inputs), larger text with stroke/shadow for readability, optional per-message fade-out (`&fade=20` seconds). OBS browser sources support transparency natively.
 
-URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1&fade=N`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
+URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1&fade=N&avatars=1`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
 
 ### 4.4 Configuration & persistence
 
@@ -260,7 +276,7 @@ v1 ships the hooks so this bolts on without restructuring:
 ## 8. Roadmap
 
 - **v1 (this doc):** read-only unified feed, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
-- **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD).
+- **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD); Twitch/Kick avatar enrichment (server-side lookup + cache, §4.1).
 - **Later:** native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
 
 ## 9. Open questions
