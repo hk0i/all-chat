@@ -5,8 +5,9 @@
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
 	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
+	import { readableColor } from '$lib/colorContrast';
 	import { openChatStream } from '$lib/stream';
-	import { toggleTheme } from '$lib/theme';
+	import { currentTheme, toggleTheme, type Theme } from '$lib/theme';
 
 	const MAX_MESSAGES = 1000;
 
@@ -29,6 +30,13 @@
 	 * noise on stream) — `&avatars=` always wins when present (EDD §3).
 	 */
 	let showAvatars = $state(true);
+
+	/**
+	 * Drives author-name contrast clamping (colorContrast.ts) — the pre-paint
+	 * script in app.html sets data-theme before this ever renders, so it's
+	 * safe to read synchronously here.
+	 */
+	let theme = $state<Theme>('dark');
 
 	/**
 	 * Platforms with more than one live source in the current view — e.g. two
@@ -75,6 +83,7 @@
 
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
+		theme = currentTheme();
 		const params = page.url.searchParams;
 		showIcons = params.get('icons') !== '0';
 		showAvatars = params.has('avatars')
@@ -111,7 +120,7 @@
 			<a class="nav" href="/profiles">profiles</a>
 			<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
 			<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
-			<button onclick={() => toggleTheme()}>theme</button>
+			<button onclick={() => (theme = toggleTheme())}>theme</button>
 		</div>
 	</header>
 
@@ -136,7 +145,9 @@
 						badges={message.author.badges}
 					/>{/if}<span
 					class="author"
-					style:color={message.author.color}
+					style:color={message.author.color
+						? readableColor(message.author.color, theme)
+						: undefined}
 					>{message.author.name}{#if message.author.login}
 						<span class="login">({message.author.login})</span>{/if}</span
 				>
