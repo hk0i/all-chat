@@ -2,23 +2,25 @@
 
 **Status:** Draft
 **Date:** 2026-07-19
-**Scope:** MVP (v1)
+**Scope:** [MVP](#def-mvp) (v1)
+
+*Acronyms link to the [glossary](#11-glossary) on first use.*
 
 ## 1. Overview
 
-All Chat is a self-hosted web app for streamers who broadcast to multiple platforms simultaneously (e.g. via [Restreamer](https://datarhei.github.io/restreamer/) or similar multistreaming setups). It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with first-class OBS integration (dockable panel + on-stream overlay). It is the chat-side companion to a video-side multistream stack: same deployment shape (a Docker container on the streamer's box), zero platform logins.
+All Chat is a self-hosted web app for streamers who broadcast to multiple platforms simultaneously (e.g. via [Restreamer](https://datarhei.github.io/restreamer/) or similar multistreaming setups). It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with first-class [OBS](#def-obs) (Open Broadcaster Software) integration (dockable panel + on-stream overlay). It is the chat-side companion to a video-side multistream stack: same deployment shape (a Docker container on the streamer's box), zero platform logins.
 
 Streams are organized into **profiles** — named groups of chat sources matching how a streamer actually goes live. A "Gaming" profile might contain `twitch/gmpekk`, `kick/gmpekk`, and `youtube/@gmpekk`; a "Game Dev" profile might contain `twitch/gmpekk`, `twitch/gmpekk`, and `youtube/@smallindie`. A profile is an **array of sources, not a platform→channel map**: the same platform can appear any number of times.
 
 The app is read-only in v1: it displays messages but cannot send them. This keeps the MVP free of login/auth flows — every supported platform has an anonymous read path.
 
-**Scale assumption:** self-hosted, one streamer (plus their OBS instances and maybe a phone) per deployment. Single-digit concurrent clients, a handful of upstream connections. No horizontal scaling, no external datastore — in-process state and a JSON file cover it.
+**Scale assumption:** self-hosted, one streamer (plus their OBS instances and maybe a phone) per deployment. Single-digit concurrent clients, a handful of upstream connections. No horizontal scaling, no external datastore — in-process state and a [JSON](#def-json) file cover it.
 
 ### Design principles
 
-- **One app, one container.** A single SvelteKit application serves the UI and all server-side ingestion. Deployed as a Docker image on the streamer's machine, LAN, or cloud.
-- **API-first: all ingestion server-side, clients are thin.** The server connects to every platform and exposes one unified SSE stream of normalized messages. The web UI, OBS dock, OBS overlay, and any future native mobile client are all equal consumers of the same endpoint — the message schema is a versioned API contract, and nothing in it is SvelteKit-specific. One upstream connection per platform+channel (refcounted), fanned out to any number of clients.
-- **Everything is a URL.** Profile, view mode, and overlay styling ride URL params (`/?profile=gaming&overlay=1`), so any view can be bookmarked, shared, docked into OBS, or used as a browser source with zero extra setup.
+- **One app, one container.** A single SvelteKit application serves the [UI](#def-ui) and all server-side ingestion. Deployed as a Docker image on the streamer's machine, [LAN](#def-lan), or cloud.
+- **[API](#def-api)-first: all ingestion server-side, clients are thin.** The server connects to every platform and exposes one unified [SSE](#def-sse) (Server-Sent Events) stream of normalized messages. The web UI, OBS dock, OBS overlay, and any future native mobile client are all equal consumers of the same endpoint — the message schema is a versioned API contract, and nothing in it is SvelteKit-specific. One upstream connection per platform+channel (refcounted), fanned out to any number of clients.
+- **Everything is a [URL](#def-url).** Profile, view mode, and overlay styling ride URL params (`/?profile=gaming&overlay=1`), so any view can be bookmarked, shared, docked into OBS, or used as a browser source with zero extra setup.
 - **Profiles are server-side state.** Stored in a JSON file on a Docker volume — stable across restarts, shared by every client, editable from any of them. localStorage holds only per-device UI preferences.
 - **No accounts, no secrets.** v1 stores nothing but profiles (names + public channel identifiers).
 
@@ -36,8 +38,8 @@ The app is read-only in v1: it displays messages but cannot send them. This keep
 
 ### Non-goals (v1, deferred to v2)
 
-- **Sending messages** to any platform (requires per-platform OAuth).
-- **Facebook Live/Gaming support.** Facebook has no anonymous chat read path — its Graph API requires page tokens, and DOM scraping is fragile. Facebook lands in v2 alongside the auth flow, which it needs anyway.
+- **Sending messages** to any platform (requires per-platform [OAuth](#def-oauth)).
+- **Facebook Live/Gaming support.** Facebook has no anonymous chat read path — its [Graph API](#def-graph-api) requires page tokens, and [DOM](#def-dom) scraping is fragile. Facebook lands in v2 alongside the auth flow, which it needs anyway.
 - Moderation actions (timeouts, bans, deletes).
 - Message persistence, search, or analytics.
 - Third-party emotes (7TV/BTTV/FFZ) — fragment model accommodates them later.
@@ -49,9 +51,9 @@ All ingestion runs server-side. Per-platform mechanics:
 
 | Platform | Transport (server ↔ platform) | Anonymous read? | Notes |
 |----------|-------------------------------|-----------------|-------|
-| Twitch | IRC over WebSocket (`wss://irc-ws.chat.twitch.tv:443`) | Yes (`justinfan<digits>` nick, no auth) | Rock-solid, documented, used by every chat tool |
-| Kick | Pusher WebSocket (public app key) + `kick.com/api` lookup | Yes | Unofficial API; lookup is behind Cloudflare |
-| YouTube | InnerTube API polling (`youtubei/v1/live_chat/get_live_chat`) | Yes (no API key/quota — same endpoint the watch page uses) | Poll interval dictated by server responses |
+| Twitch | [IRC](#def-irc) over [WebSocket](#def-websocket) (`wss://irc-ws.chat.twitch.tv:443`) | Yes (`justinfan<digits>` nick, no auth) | Rock-solid, documented, used by every chat tool |
+| Kick | [Pusher](#def-pusher) WebSocket (public app key) + `kick.com/api` lookup | Yes | Unofficial API; lookup is behind Cloudflare |
+| YouTube | [InnerTube](#def-innertube) API polling (`youtubei/v1/live_chat/get_live_chat`) | Yes (no API key/quota — same endpoint the watch page uses) | Poll interval dictated by server responses |
 | Facebook | Graph API / DOM scraping | No | Deferred to v2 |
 
 ### 3.1 Twitch
@@ -80,7 +82,7 @@ The watch page's own chat uses InnerTube's `youtubei/v1/live_chat/get_live_chat`
 - `GET /api/chat/stream?profile=<idOrName>` — **the** endpoint: unified SSE stream (`text/event-stream`) of normalized `ChatMessage` JSON from every source in the profile, plus `status` events per source (connecting / live / reconnecting / failed). Events tag the originating `sourceId`, so clients can tell apart two sources on the same platform.
 - Ad-hoc form (no profile needed): `GET /api/chat/stream?source=twitch:gmpekk&source=twitch:gmpekk&source=youtube:@smallindie` — repeated `source=platform:channel` params, duplicates of a platform welcome.
 
-**Profiles (CRUD):**
+**Profiles ([CRUD](#def-crud)):**
 
 - `GET /api/profiles` — list.
 - `POST /api/profiles` — create `{ name, sources: SourceConfig[] }`.
@@ -90,10 +92,10 @@ The watch page's own chat uses InnerTube's `youtubei/v1/live_chat/get_live_chat`
 **Helpers:**
 
 - `GET /api/youtube/resolve/[input]` — URL/ID/handle → live video ID (also used internally by the stream route).
-- `GET /api/kick/channel/[slug]` — chatroom ID lookup (cached; exposed for the manual-fallback UX).
+- `GET /api/kick/channel/[slug]` — chatroom ID lookup (cached; exposed for the manual-fallback [UX](#def-ux)).
 - `GET /api/health` — liveness.
 
-No credentials anywhere. Upstream connections are keyed by platform+channel and refcounted: the first subscriber to a source opens the upstream connection, later subscribers share it — including across profiles (two profiles containing `twitch/gmpekk` share one IRC connection). If the same source appears twice within one profile, it is deduplicated at connection level and delivered once. SSE (not WebSocket) because the v1 flow is one-way, it fits SvelteKit routes natively, and every mobile HTTP stack speaks it; v2 message-sending will use plain POST endpoints alongside the stream.
+No credentials anywhere. Upstream connections are keyed by platform+channel and refcounted: the first subscriber to a source opens the upstream connection, later subscribers share it — including across profiles (two profiles containing `twitch/gmpekk` share one IRC connection). If the same source appears twice within one profile, it is deduplicated at connection level and delivered once. SSE (not WebSocket) because the v1 flow is one-way, it fits SvelteKit routes natively, and every mobile [HTTP](#def-http) stack speaks it; v2 message-sending will use plain POST endpoints alongside the stream.
 
 ## 4. Architecture
 
@@ -154,20 +156,20 @@ type Fragment =
   | { kind: 'emote'; name: string; url: string };
 ```
 
-Emotes render as inline images from each platform's public CDN (all three serve emote images without auth).
+Emotes render as inline images from each platform's public [CDN](#def-cdn) (all three serve emote images without auth).
 
 **Author color and avatar availability is asymmetric across platforms** (verified):
 
 | | Name color | Avatar in chat payload |
 |---|---|---|
-| Twitch | ✓ IRC `color` tag (user-chosen hex) | ✗ — requires Helix API (OAuth) or third-party lookup |
+| Twitch | ✓ IRC `color` tag (user-chosen hex) | ✗ — requires [Helix](#def-helix) API (OAuth) or third-party lookup |
 | Kick | ✓ `sender.identity.color` hex | ✗ — requires profile lookup |
 | YouTube | ✗ — user name colors don't exist on YouTube chat | ✓ `authorPhoto.thumbnails[]` in every message |
 
 Handling:
 
 - `color`: pass through when the platform provides it; otherwise derive a stable hue from a hash of the author name (YouTube, and Twitch users who never set a color). Merged feed looks uniform either way.
-- `avatarUrl`: optional by design. v1 populates it for YouTube only (free in the payload). Twitch/Kick avatar **enrichment** is v2: a server-side per-user lookup with an LRU+TTL cache — Twitch via Helix once platform OAuth exists, Kick via its profile API (same Cloudflare caveats as the channel lookup). The field exists in the contract from day one so enrichment changes no schema.
+- `avatarUrl`: optional by design. v1 populates it for YouTube only (free in the payload). Twitch/Kick avatar **enrichment** is v2: a server-side per-user lookup with an [LRU](#def-lru)+[TTL](#def-ttl) cache — Twitch via Helix once platform OAuth exists, Kick via its profile API (same Cloudflare caveats as the channel lookup). The field exists in the contract from day one so enrichment changes no schema.
 - Renderers must treat `avatarUrl` as absent-friendly: fallback is a colored-initial disc (using `author.color`), so a mixed feed (YouTube with photos, Twitch/Kick with discs) stays visually coherent.
 
 This schema is the API contract for all clients (web, OBS, future mobile). Wire format is JSON over SSE; the stream is versioned via an `X-AllChat-API` response header and an initial `hello` event carrying `{ apiVersion }`, so native clients can detect drift. Types live in `src/lib/types.ts` and are the single source of truth; if a native client materializes, they export cleanly to a small shared package.
@@ -202,7 +204,7 @@ URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1
 
 - **Framework:** SvelteKit + TypeScript, `adapter-node`. One app: UI + API routes. Svelte's compiled output keeps the feed hot path lean; the API surface is plain HTTP/SSE with nothing SvelteKit-specific in the contract.
 - **Streaming:** unified SSE endpoint (native `ReadableStream` response in a server route). Server-side WebSocket clients (`ws` package or Node's built-in `WebSocket`) for Twitch IRC and Kick Pusher.
-- **Styling:** hand-rolled CSS, dark theme default (streamers run dark UIs); transparent theme for overlay mode. No CSS framework.
+- **Styling:** hand-rolled [CSS](#def-css), dark theme default (streamers run dark UIs); transparent theme for overlay mode. No CSS framework.
 - **Testing:** Vitest for message parsers/normalizers, fixture-driven with recorded real payloads per platform. Parsers are the fragile surface; they get the coverage.
 - **Repo layout:**
   ```
@@ -225,7 +227,7 @@ URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1
 
 ## 6. Deployment
 
-**Primary: Docker image** (GHCR), run on the streamer's machine, home server/LAN, or any cloud host:
+**Primary: Docker image** ([GHCR](#def-ghcr), GitHub Container Registry), run on the streamer's machine, home server/LAN, or any cloud host:
 
 ```sh
 docker run -p 8420:3000 -v allchat-data:/data ghcr.io/<owner>/all-chat
@@ -241,7 +243,7 @@ Security note: in v1 the server exposes only stateless read-only routes plus pro
 
 ### 6.1 Auth for cloud hosting (v2 design, v1 hooks)
 
-Single-user by design — one streamer per deployment. No multi-user, no roles, no third-party OAuth/OIDC provider. Three credentials for three client shapes:
+Single-user by design — one streamer per deployment. No multi-user, no roles, no third-party OAuth/[OIDC](#def-oidc) provider. Three credentials for three client shapes:
 
 | Credential | Who uses it | Grants | Storage |
 |-----------|-------------|--------|---------|
@@ -252,10 +254,10 @@ Single-user by design — one streamer per deployment. No multi-user, no roles, 
 Behavior:
 
 - **Auth is off until configured.** No password set → open access (the localhost/LAN default, matching how Restreamer-adjacent tools behave). Password set → everything locked except `GET /api/health`.
-- **Sending chat from the OBS dock (v2) uses the session cookie, not a URL token.** This matches industry practice: OBS docks are real embedded Chromium (CEF) with their own persistent cookie store (survives OBS restarts), and Twitch popout chat, Restream's `chat.restream.io` dock, and Streamlabs all handle send-capable OBS panels via in-dock login. Tokenized URLs appear across those products only for display-only browser-source widgets (Streamlabs `widgets/chat-box/<token>`, Restream's "embed in stream" URL) — exactly the split in the table above. Practical consequence: sessions must be long-lived with refresh-on-use (e.g. 90 days) so the streamer logs into the dock once, not every stream. Our login is a plain first-party password form, so CEF's known flakiness with third-party OAuth popups doesn't apply.
+- **Sending chat from the OBS dock (v2) uses the session cookie, not a URL token.** This matches industry practice: OBS docks are real embedded Chromium ([CEF](#def-cef), Chromium Embedded Framework) with their own persistent cookie store (survives OBS restarts), and Twitch popout chat, Restream's `chat.restream.io` dock, and Streamlabs all handle send-capable OBS panels via in-dock login. Tokenized URLs appear across those products only for display-only browser-source widgets (Streamlabs `widgets/chat-box/<token>`, Restream's "embed in stream" URL) — exactly the split in the table above. Practical consequence: sessions must be long-lived with refresh-on-use (e.g. 90 days) so the streamer logs into the dock once, not every stream. Our login is a plain first-party password form, so CEF's known flakiness with third-party OAuth popups doesn't apply.
 - The "copy OBS URLs" helper mints/embeds a URL token automatically when auth is on.
 - URL tokens are the one deliberate compromise (tokens in query strings can leak via logs); they are scoped read-only, per-source revocable, and only exist because OBS browser sources cannot present cookies or headers.
-- Cookie sessions: `HttpOnly`, `SameSite=Lax`; HTTPS/`Secure` expected to come from the user's reverse proxy — the app itself does not terminate TLS.
+- Cookie sessions: `HttpOnly`, `SameSite=Lax`; [HTTPS](#def-http)/`Secure` expected to come from the user's reverse proxy — the app itself does not terminate [TLS](#def-tls).
 
 v1 ships the hooks so this bolts on without restructuring:
 
@@ -271,7 +273,7 @@ v1 ships the hooks so this bolts on without restructuring:
 | YouTube InnerTube shape changes | Medium | Same isolation + fixtures; poller failures surface as source status in UI |
 | Cloudflare blocks server's Kick lookups (esp. from cloud IPs) | Medium | Manual chatroom ID entry always available |
 | Twitch anonymous IRC restricted | Low | Would break the entire ecosystem of chat tools; unlikely without notice |
-| High-throughput channels (10k+ msg/min) jank the UI | Medium | rAF batching, ring buffer, virtualization if needed |
+| High-throughput channels (10k+ msg/min) jank the UI | Medium | [rAF](#def-raf) (requestAnimationFrame) batching, ring buffer, virtualization if needed |
 | OBS embedded browser (CEF) quirks in dock/overlay | Low–Med | CEF is Chromium; avoid bleeding-edge CSS; test dock + source in OBS as a release gate |
 
 ## 8. Roadmap
@@ -282,7 +284,7 @@ v1 ships the hooks so this bolts on without restructuring:
 
 ## 9. Ecosystem: chatbot and other integrations
 
-All Chat is deliberately **not** extensible in-process — no plugin loader, no extension API inside the app. The HTTP API is the extension surface. Anything that wants chat (a bot, a logger, a TTS reader, analytics) is an API client with the same standing as the web UI, OBS views, or a mobile app. This keeps the core small and makes integrations crash-isolated, independently deployable, and language-agnostic by construction.
+All Chat is deliberately **not** extensible in-process — no plugin loader, no extension API inside the app. The HTTP API is the extension surface. Anything that wants chat (a bot, a logger, a [TTS](#def-tts) text-to-speech reader, analytics) is an API client with the same standing as the web UI, OBS views, or a mobile app. This keeps the core small and makes integrations crash-isolated, independently deployable, and language-agnostic by construction.
 
 ### 9.1 All Chat as the chat gateway
 
@@ -307,7 +309,7 @@ flowchart LR
 ### 9.2 What the bot owns (design sketch — full EDD lives in the bot's repo)
 
 - Command handling (`!uptime`, `!so`), timers, moderation logic, personality — all behavior.
-- **Homebrew plugin system:** user plugins as JS/TS modules in a mounted `/data/plugins` directory; event-hook API (`onMessage(msg, ctx)`, command registry, scheduled hooks, `ctx.reply(...)`). Plugins run with full process privileges — self-hosted, the user runs their own code; documented, not sandboxed. Sandboxing/permissions only if a community plugin-sharing ecosystem ever emerges.
+- **Homebrew plugin system:** user plugins as [JS/TS](#def-jsts) (JavaScript/TypeScript) modules in a mounted `/data/plugins` directory; event-hook API (`onMessage(msg, ctx)`, command registry, scheduled hooks, `ctx.reply(...)`). Plugins run with full process privileges — self-hosted, the user runs their own code; documented, not sandboxed. Sandboxing/permissions only if a community plugin-sharing ecosystem ever emerges.
 - Plugin authors get All Chat's normalized `ChatMessage` shape (§4.1) — one message format regardless of platform, `sourceId` included for per-channel behavior.
 
 ### 9.3 Gateway guarantees the ecosystem relies on
@@ -323,3 +325,42 @@ Already in the v1 design, listed here as commitments:
 1. Overlay styling surface for v1: just size/fade params, or a small theme editor? Leaning params-only; theming is a rabbit hole.
 2. YouTube poller sharing: refcount per video is designed in — is multi-client (streamer's browser + OBS dock + overlay all connected at once) the common case? Yes, likely three concurrent clients; SSE fan-out from one poller handles it.
 3. Docker image publishing cadence: tag-based releases vs every-main-commit `:edge`. Proposal: both.
+
+## 11. Glossary
+
+Acronyms and jargon used in this document, in alphabetical order. First uses in the text link here.
+
+| Term | Meaning |
+|------|---------|
+| <a id="def-api"></a>**API** | Application Programming Interface — the set of HTTP endpoints a program (rather than a person) uses to talk to a service. |
+| <a id="def-cdn"></a>**CDN** | Content Delivery Network — globally distributed servers that host static assets like emote images. |
+| <a id="def-cef"></a>**CEF** | Chromium Embedded Framework — a full Chromium browser embedded inside another application; what OBS uses to render browser docks and browser sources. |
+| <a id="def-ci"></a>**CI** | Continuous Integration — automated checks (build, tests) run on every code change; here, GitHub Actions. |
+| <a id="def-crud"></a>**CRUD** | Create, Read, Update, Delete — the four basic operations on stored data. |
+| <a id="def-css"></a>**CSS** | Cascading Style Sheets — the language that styles web pages. |
+| <a id="def-dom"></a>**DOM** | Document Object Model — the live structure of a web page; "DOM scraping" means extracting data from a page's rendered structure rather than from an official API. |
+| <a id="def-edd"></a>**EDD** | Engineering Design Document — this document. |
+| <a id="def-ghcr"></a>**GHCR** | GitHub Container Registry — GitHub's hosting service for Docker images. |
+| <a id="def-graph-api"></a>**Graph API** | Facebook's official API for reading Facebook data, including Live video comments; requires authenticated access tokens. |
+| <a id="def-helix"></a>**Helix** | Twitch's official public API (the successor to their "Kraken" API); requires OAuth credentials. |
+| <a id="def-http"></a>**HTTP / HTTPS** | HyperText Transfer Protocol (Secure) — the protocol of the web; the S variant is encrypted with TLS. |
+| <a id="def-innertube"></a>**InnerTube** | YouTube's internal API — the one YouTube's own website and apps use. Not officially documented, but has no API-key or quota requirements. |
+| <a id="def-irc"></a>**IRC** | Internet Relay Chat — a text-chat protocol from 1988; Twitch chat is built on a subset of it. |
+| <a id="def-json"></a>**JSON** | JavaScript Object Notation — the standard text format for structured data exchange. |
+| <a id="def-jsts"></a>**JS / TS** | JavaScript / TypeScript — the languages of the web; TypeScript is JavaScript with static types. |
+| <a id="def-lan"></a>**LAN** | Local Area Network — the streamer's home/office network, not reachable from the public internet. |
+| <a id="def-lru"></a>**LRU** | Least Recently Used — a cache eviction strategy: when full, discard the entry unused for the longest time. |
+| <a id="def-mvp"></a>**MVP** | Minimum Viable Product — the smallest version of the product worth shipping. |
+| <a id="def-oauth"></a>**OAuth** | Open Authorization — the standard by which a user grants an app scoped access to their account on another service (e.g. "let this app post chat messages as me"). |
+| <a id="def-obs"></a>**OBS** | Open Broadcaster Software — the de-facto standard free streaming/recording application. |
+| <a id="def-oidc"></a>**OIDC** | OpenID Connect — an identity layer on top of OAuth used for "Sign in with X" flows. |
+| <a id="def-pusher"></a>**Pusher** | A commercial WebSocket message-delivery service; Kick uses it to deliver chat messages to clients. |
+| <a id="def-raf"></a>**rAF** | `requestAnimationFrame` — a browser API that schedules work to run once per screen refresh; used to batch message rendering. |
+| <a id="def-sse"></a>**SSE** | Server-Sent Events — a web standard where the server holds an HTTP response open and pushes a one-way stream of events to the client. (Not server-side encryption or security service edge.) |
+| <a id="def-tls"></a>**TLS** | Transport Layer Security — the encryption protocol underneath HTTPS. |
+| <a id="def-ttl"></a>**TTL** | Time To Live — how long a cached entry stays valid before it must be refetched. |
+| <a id="def-tts"></a>**TTS** | Text-To-Speech — synthesizing spoken audio from text, e.g. reading chat messages aloud. |
+| <a id="def-ui"></a>**UI** | User Interface — what the user sees and interacts with. |
+| <a id="def-url"></a>**URL** | Uniform Resource Locator — a web address. |
+| <a id="def-ux"></a>**UX** | User Experience — how using the product feels end to end. |
+| <a id="def-websocket"></a>**WebSocket / `wss://`** | A protocol for persistent two-way connections between client and server; `wss://` is its encrypted form. |
