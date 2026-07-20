@@ -93,6 +93,21 @@ describe('privmsgToChatMessage', () => {
 		expect(message?.fragments).toEqual([{ kind: 'text', text: 'waves' }]);
 	});
 
+	it('exposes login for localized display names, matching case-insensitively otherwise', () => {
+		const localized =
+			'@display-name=ぺっく;id=l1;tmi-sent-ts=1784000000004 ' +
+			':gmpekk!gmpekk@gmpekk.tmi.twitch.tv PRIVMSG #c :こんにちは';
+		expect(privmsgToChatMessage(parseIrcLine(localized)!, 's')?.author).toMatchObject({
+			name: 'ぺっく',
+			login: 'gmpekk'
+		});
+
+		// Plain case difference (display-name "Casual" vs login "casual") is not localized.
+		const plain = privmsgToChatMessage(parseIrcLine(PRIVMSG_PLAIN)!, 's');
+		expect(plain?.author.name).toBe('Casual');
+		expect(plain?.author.login).toBeUndefined();
+	});
+
 	it('ignores non-PRIVMSG lines', () => {
 		expect(privmsgToChatMessage(parseIrcLine(PING)!, 's')).toBeUndefined();
 	});

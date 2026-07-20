@@ -55,7 +55,10 @@
 	<ul class="feed">
 		{#each messages as message (message.id)}
 			<li>
-				<span class="author" style:color={message.author.color}>{message.author.name}</span>
+				<span class="author" style:color={message.author.color}
+					>{message.author.name}{#if message.author.login}
+						<span class="login">({message.author.login})</span>{/if}</span
+				>
 				{#each message.fragments as fragment, index (index)}
 					{#if fragment.kind === 'text'}<span>{fragment.text}</span>{:else}<img
 							src={fragment.url}
@@ -149,6 +152,11 @@
 	.author {
 		font-weight: 600;
 		margin-right: 0.4rem;
+	}
+
+	.login {
+		font-weight: 400;
+		opacity: 0.6;
 	}
 
 	.emote {

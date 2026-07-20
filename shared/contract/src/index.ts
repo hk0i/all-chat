@@ -52,6 +52,12 @@ export type Fragment =
 
 export interface ChatAuthor {
 	name: string;
+	/**
+	 * Account/login name, present only when it differs from `name` beyond
+	 * case — e.g. Twitch localized display names (name "ぺっく", login
+	 * "gmpekk"). Clients render it as a readable fallback: ぺっく (gmpekk).
+	 */
+	login?: string;
 	/** Platform-provided hex color, or hash-derived by the server when absent upstream. */
 	color?: string;
 	/** Platform-provided avatar URL when available (YouTube in v1). Absent-friendly by design. */

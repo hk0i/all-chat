@@ -115,6 +115,10 @@ export function privmsgToChatMessage(line: IrcLine, sourceId: string): ChatMessa
 		timestamp,
 		author: {
 			name,
+			// Localized display names (e.g. Japanese) differ from the login
+			// beyond case; expose the login so clients can render it as a
+			// readable fallback, matching native Twitch behavior.
+			...(name.toLowerCase() !== login ? { login } : {}),
 			color: line.tags.color || hashColor(login),
 			badges: parseBadges(line.tags.badges, line.tags['badge-info'])
 		},
