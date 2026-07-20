@@ -1,6 +1,7 @@
 import type { ChatMessage, Platform, SourceConfig, SourceState, StatusEvent } from '@all-chat/contract';
 import type { ChatSource } from './sources/types';
 import { FakeSource } from './sources/fake';
+import { TwitchSource } from './sources/twitch';
 
 export interface Subscriber {
 	onMessage(message: ChatMessage): void;
@@ -21,11 +22,16 @@ interface LiveSource {
 /** Upstream connections are shared per platform+channel (EDD §3.4). */
 const connectionKey = (platform: Platform, channel: string) => `${platform}:${channel.toLowerCase()}`;
 
-const createSource = (platform: Platform, sourceId: string, channel: string): ChatSource => {
-	// Real platform sources land per-platform; the scaffold wires everything
-	// to FakeSource so the pipeline is exercisable end to end.
-	void platform;
-	return new FakeSource(sourceId, channel);
+export type CreateSource = (platform: Platform, sourceId: string, channel: string) => ChatSource;
+
+const defaultCreateSource: CreateSource = (platform, sourceId, channel) => {
+	switch (platform) {
+		case 'twitch':
+			return new TwitchSource(sourceId, channel);
+		default:
+			// Kick/YouTube land next; FakeSource keeps their pipeline exercisable.
+			return new FakeSource(sourceId, channel);
+	}
 };
 
 /**
@@ -35,6 +41,8 @@ const createSource = (platform: Platform, sourceId: string, channel: string): Ch
  */
 export class SourceManager {
 	private live = new Map<string, LiveSource>();
+
+	constructor(private readonly createSource: CreateSource = defaultCreateSource) {}
 
 	subscribe(subscriber: Subscriber, sources: SourceConfig[]): () => void {
 		// Exact duplicates within one subscription are delivered once (EDD §3.4).
@@ -49,7 +57,7 @@ export class SourceManager {
 
 			let entry = this.live.get(key);
 			if (!entry) {
-				const source = createSource(config.platform, config.id, config.channel);
+				const source = this.createSource(config.platform, config.id, config.channel);
 				entry = {
 					source,
 					refCount: 0,
