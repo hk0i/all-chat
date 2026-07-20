@@ -68,7 +68,7 @@ References: [Twitch IRC docs](https://dev.twitch.tv/docs/chat/irc/) (message for
 1. **Resolve channel → chatroom ID:** `GET https://kick.com/api/v2/channels/{slug}` returns `chatroom.id`. Results cached; on Cloudflare blocks, UI falls back to prompting for a manually entered chatroom ID.
 2. **Subscribe:** Pusher WebSocket with Kick's public app key (`wss://ws-us2.pusher.com/app/<key>?protocol=7`), `pusher:subscribe` to `chatrooms.<id>.v2`. `ChatMessage` events carry sender, badges, color, emote placeholders.
 
-Risk: unofficial API; Kick has churned the Pusher key/cluster before. All Kick constants isolated in one module; breakage treated as expected maintenance.
+Risk: unofficial API; Kick has churned the Pusher key/cluster before. All Kick constants isolated in one module (`web/src/lib/server/sources/kick/constants.ts`); breakage treated as expected maintenance. The Pusher key is public (every kick.com visitor's browser receives it); when it rotates, re-derive it from kick.com via browser DevTools → Network → WS filter → the `wss://ws-<cluster>.pusher.com/app/<key>?protocol=7` connection URL, and cross-check against community Kick client libraries on GitHub, which track rotations quickly.
 
 ### 3.3 YouTube
 
