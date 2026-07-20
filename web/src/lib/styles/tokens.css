@@ -1,0 +1,89 @@
+/*
+ * Design tokens — exported from the onebigfunction-library Figma palette
+ * (loosely based on Tango). See docs/EDD.md §5.2. Components use semantic
+ * tokens only, never raw scale values.
+ */
+:root {
+	/* Primary / Tango Orange */
+	--primary-50: #fce2bd;
+	--primary-300: #fcc97e;
+	--primary-500: #fcaf3e;
+	--primary-700: #f57900;
+	--primary-900: #ce5c00;
+
+	/* Secondary / Tango Plum */
+	--secondary-50: #ffedfd;
+	--secondary-300: #e0badc;
+	--secondary-500: #ad7fa8;
+	--secondary-700: #75507b;
+	--secondary-900: #5c3566;
+
+	/* Success / Tango Chameleon */
+	--success-50: #d4ffab;
+	--success-300: #aff26d;
+	--success-500: #8ae234;
+	--success-700: #73d216;
+	--success-900: #4e9a06;
+
+	/* Warning / Tango Butter */
+	--warning-50: #fff49c;
+	--warning-300: #fced74;
+	--warning-500: #fce94f;
+	--warning-700: #edd400;
+	--warning-900: #c4a000;
+
+	/* Error / Tango Scarlet Red */
+	--error-50: #ffc4c4;
+	--error-300: #fa7575;
+	--error-500: #ef2929;
+	--error-700: #cc0000;
+	--error-900: #a40000;
+
+	/* Neutral ramp (blue-tinted) */
+	--neutral-50: #f2f8ff;
+	--neutral-100: #d9eaff;
+	--neutral-200: #bfdcff;
+	--neutral-300: #a7ceff;
+	--neutral-400: #7590b2;
+	--neutral-500: #546880;
+	--neutral-600: #333f4e;
+	--neutral-700: #232b36;
+	--neutral-800: #12161c;
+	--neutral-900: #000000;
+
+	--white: #ffffff;
+	--black: #000000;
+
+	/* Platform identity colors (not part of the Tango palette — EDD §5.2) */
+	--platform-twitch: #9146ff;
+	--platform-kick: #53fc18;
+	--platform-youtube: #ff0000;
+}
+
+/* Semantic tokens — dark theme (default) */
+:root,
+:root[data-theme='dark'] {
+	--bg: var(--neutral-800);
+	--surface: var(--neutral-700);
+	--border: var(--neutral-600);
+	--text: var(--neutral-100);
+	--text-muted: var(--neutral-400);
+	--accent: var(--primary-500);
+	--accent-hover: var(--primary-300);
+	--status-live: var(--success-500);
+	--status-reconnecting: var(--warning-500);
+	--status-failed: var(--error-500);
+}
+
+:root[data-theme='light'] {
+	--bg: var(--neutral-50);
+	--surface: var(--white);
+	--border: var(--neutral-200);
+	--text: var(--neutral-800);
+	--text-muted: var(--neutral-500);
+	--accent: var(--primary-700);
+	--accent-hover: var(--primary-900);
+	--status-live: var(--success-900);
+	--status-reconnecting: var(--warning-900);
+	--status-failed: var(--error-700);
+}

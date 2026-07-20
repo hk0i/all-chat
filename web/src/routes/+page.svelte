@@ -1,0 +1,158 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
+	import { openChatStream } from '$lib/stream';
+	import { toggleTheme } from '$lib/theme';
+
+	const MAX_MESSAGES = 1000;
+
+	let messages = $state<ChatMessage[]>([]);
+	let statuses = $state<Record<string, StatusEvent>>({});
+	let connected = $state(false);
+
+	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
+	onMount(() => {
+		const params = page.url.searchParams;
+		if (!params.has('profile') && !params.has('source')) return;
+
+		const close = openChatStream(params.toString(), {
+			onHello: () => (connected = true),
+			onMessage: (message) => {
+				messages = [...messages.slice(-(MAX_MESSAGES - 1)), message];
+			},
+			onStatus: (status) => {
+				statuses = { ...statuses, [status.sourceId]: status };
+			},
+			onError: () => (connected = false)
+		});
+		return close;
+	});
+</script>
+
+<svelte:head>
+	<title>All Chat</title>
+</svelte:head>
+
+<main>
+	<header>
+		<h1>All Chat</h1>
+		<div class="controls">
+			{#each Object.values(statuses) as status (status.sourceId)}
+				<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
+			{/each}
+			<button onclick={() => toggleTheme()}>theme</button>
+		</div>
+	</header>
+
+	{#if !connected && messages.length === 0}
+		<p class="hint">
+			Pass <code>?source=twitch:somechannel</code> (repeatable) or <code>?profile=name</code> to
+			connect. Scaffold build — sources are fakes until platform ingestion lands.
+		</p>
+	{/if}
+
+	<ul class="feed">
+		{#each messages as message (message.id)}
+			<li>
+				<span class="author" style:color={message.author.color}>{message.author.name}</span>
+				{#each message.fragments as fragment, index (index)}
+					{#if fragment.kind === 'text'}<span>{fragment.text}</span>{:else}<img
+							src={fragment.url}
+							alt={fragment.name}
+							class="emote"
+						/>{/if}
+				{/each}
+			</li>
+		{/each}
+	</ul>
+</main>
+
+<style>
+	main {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		max-width: 720px;
+		margin: 0 auto;
+		padding: 0 1rem;
+	}
+
+	header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	h1 {
+		font-size: 1.1rem;
+		margin: 0;
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.status {
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 50%;
+		background: var(--text-muted);
+	}
+
+	.status-live {
+		background: var(--status-live);
+	}
+
+	.status-reconnecting,
+	.status-connecting {
+		background: var(--status-reconnecting);
+	}
+
+	.status-failed {
+		background: var(--status-failed);
+	}
+
+	button {
+		background: var(--surface);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.25rem 0.6rem;
+		cursor: pointer;
+	}
+
+	button:hover {
+		border-color: var(--accent);
+	}
+
+	.hint {
+		color: var(--text-muted);
+	}
+
+	.feed {
+		list-style: none;
+		margin: 0;
+		padding: 0.5rem 0;
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.feed li {
+		padding: 0.15rem 0;
+	}
+
+	.author {
+		font-weight: 600;
+		margin-right: 0.4rem;
+	}
+
+	.emote {
+		height: 1.4em;
+		vertical-align: middle;
+	}
+</style>

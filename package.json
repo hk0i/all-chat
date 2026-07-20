@@ -1,0 +1,20 @@
+{
+	"name": "all-chat",
+	"private": true,
+	"version": "0.1.0",
+	"license": "GPL-3.0-only",
+	"workspaces": [
+		"shared/contract",
+		"web"
+	],
+	"scripts": {
+		"dev": "npm run dev -w web",
+		"build": "npm run build -w web",
+		"preview": "npm run preview -w web",
+		"check": "npm run check --workspaces --if-present",
+		"test": "npm run test --workspaces --if-present"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}

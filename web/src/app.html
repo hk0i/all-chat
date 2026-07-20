@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+		<script>
+			// Theme before first paint (EDD §5): toggle → ?theme= → system → dark.
+			(function () {
+				var stored = localStorage.getItem('allchat:theme');
+				var param = new URLSearchParams(location.search).get('theme');
+				var system = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+				var theme = stored || param || system;
+				document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+			})();
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
