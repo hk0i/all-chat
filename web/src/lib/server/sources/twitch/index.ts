@@ -26,6 +26,12 @@ export type SocketFactory = (url: string) => SocketLike;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 
+/* IRC numeric replies (RFC 1459 names). */
+/**  registration accepted — safe to JOIN */
+const RPL_WELCOME = '001';
+/** end of NAMES list — join confirmed */
+const RPL_ENDOFNAMES = '366';
+
 export class TwitchSource implements ChatSource {
 	private socket: SocketLike | undefined;
 	private messageCb: ((message: ChatMessage) => void) | undefined;
@@ -95,11 +101,11 @@ export class TwitchSource implements ChatSource {
 			case 'PING':
 				this.socket?.send(`PONG :${line.params[0] ?? 'tmi.twitch.tv'}`);
 				return;
-			case '001': // welcome — safe to join
+			case RPL_WELCOME:
 				this.socket?.send(`JOIN #${this.channel.toLowerCase()}`);
 				return;
 			case 'JOIN':
-			case '366': // end of NAMES — join confirmed (both can fire; emit once)
+			case RPL_ENDOFNAMES: // either can confirm the join; emit live once
 				if (!this.joined) {
 					this.joined = true;
 					this.attempts = 0;
