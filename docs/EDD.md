@@ -3,6 +3,8 @@
 **Status:** Draft
 **Date:** 2026-07-19
 **Scope:** [MVP](#def-mvp) (v1)
+**Author:** Gregory McQuillan
+**License:** This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)).
 
 *Acronyms link to the [glossary](#11-glossary) on first use.*
 
@@ -413,6 +415,7 @@ Open source from the first commit. Structure chosen so the copyleft core can nev
 - **This repo (server + web app): GPL-3.0-only.** Copyleft protects the core product.
 - **API contract artifacts (`shared/contract/` — `types.ts` and the JSON Schema generated from it): MIT**, via a per-directory license notice. Client authors in any language embed generated types (Swift `Codable`, Kotlin, etc.) under any license, no GPL questions. This is what "mobile clients can connect" needs — and note it is guaranteed even without the MIT carve-out: **GPL propagates through code derivation, not network connection.** A client speaking HTTP/SSE to a GPL server is not a derivative work; no dual MIT+GPL license of the whole repo is needed.
 - **Native mobile apps (separate repos, later): MIT.** GPL3 is the wrong license *there* for a practical reason — GPL3's terms conflict with App Store distribution (the VLC precedent). The apps are independent works talking to the API, so their license is independent of the server's.
+- **Design docs (`docs/`): CC BY-SA 4.0**, not GPL-3.0. GPL is written for software; copyleft over prose (what counts as a "derivative" of a design doc?) gets legally murky under it. CC BY-SA is the purpose-built analog — same share-alike/copyleft intent, designed for non-software works — and is what most projects use for design docs/wikis.
 - **Bot and its homebrew plugins (§9.2):** bot repo GPL-3.0; user plugins load at runtime as data/configuration in the user's own deployment and are theirs — running private plugins triggers no GPL distribution obligation (GPL obligations attach to distribution, not private use).
 - **Known accepted gap:** plain GPL-3.0 permits hosting a modified All Chat as a network service without publishing changes (the "SaaS loophole"); AGPL-3.0 would close it. For a self-hosted single-streamer tool this is deemed acceptable — revisit before first release if it stops feeling acceptable, since relicensing later requires all contributors' consent.
 

@@ -86,9 +86,10 @@ Try the stream pipeline against a live channel:
 | `web/` | SvelteKit gateway: web UI + API server, one deployable | GPL-3.0-only |
 | `shared/contract/` | Wire-format types — the API contract for all clients | MIT |
 | `ios/`, `android/` | Native apps (future) | MIT |
-| `docs/` | Design docs | — |
+| `docs/` | Design docs | CC BY-SA 4.0 |
 
 ## License
 
-GPL-3.0-only, except `shared/contract/` (MIT) — see [docs/EDD.md §9.4](docs/EDD.md)
-for the reasoning.
+GPL-3.0-only, except `shared/contract/` (MIT) and `docs/` (CC BY-SA 4.0,
+[docs/LICENSE](docs/LICENSE)) — see [docs/EDD.md §9.4](docs/EDD.md) for the
+reasoning.

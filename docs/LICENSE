@@ -1,0 +1,18 @@
+All Chat design documentation
+Copyright (C) 2026 Gregory McQuillan
+
+Design documentation in this directory (docs/) is licensed under the
+Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA
+4.0).
+
+To view a copy of this license, visit
+https://creativecommons.org/licenses/by-sa/4.0/
+
+or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042,
+USA.
+
+Full legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+This applies to the prose, diagrams, and structure of the design
+documentation itself — not to source code, which is licensed as described
+in the repository root LICENSE (and shared/contract/LICENSE).
