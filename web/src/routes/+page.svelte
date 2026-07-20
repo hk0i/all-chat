@@ -488,6 +488,17 @@
 
 	main.overlay .feed {
 		font-size: 1.3rem;
+		/*
+		 * Anchor to the bottom of the viewport instead of the top — a chat
+		 * overlay reads as messages arriving at the bottom and pushing older
+		 * ones up, not as a top-anchored log with empty space below it. No
+		 * scrollbar: overflow is expected to stay bounded by the fade-eviction
+		 * sweep, and a scrollbar has no place on a chrome-less stream overlay.
+		 */
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		overflow-y: hidden;
 	}
 
 	main.overlay .feed li {
