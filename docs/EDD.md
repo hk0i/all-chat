@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-All Chat is a self-hosted web app for streamers who broadcast to multiple platforms simultaneously (e.g. via [Restreamer](https://datarhei.github.io/restreamer/) or similar multistreaming setups). It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with a grid view of per-platform chats as a secondary display mode, and first-class OBS integration (dockable panel + on-stream overlay). It is the chat-side companion to a video-side multistream stack: same deployment shape (a Docker container on the streamer's box), zero platform logins.
+All Chat is a self-hosted web app for streamers who broadcast to multiple platforms simultaneously (e.g. via [Restreamer](https://datarhei.github.io/restreamer/) or similar multistreaming setups). It aggregates live chat from Twitch, Kick, and YouTube into a single unified message feed, with first-class OBS integration (dockable panel + on-stream overlay). It is the chat-side companion to a video-side multistream stack: same deployment shape (a Docker container on the streamer's box), zero platform logins.
 
 Streams are organized into **profiles** — named groups of chat sources matching how a streamer actually goes live. A "Gaming" profile might contain `twitch/gmpekk`, `kick/gmpekk`, and `youtube/@gmpekk`; a "Game Dev" profile might contain `twitch/gmpekk`, `twitch/gmpekk`, and `youtube/@smallindie`. A profile is an **array of sources, not a platform→channel map**: the same platform can appear any number of times.
 
@@ -28,9 +28,8 @@ The app is read-only in v1: it displays messages but cannot send them. This keep
 
 - Stream profiles: named source groups, any mix of platforms, duplicates allowed; create/edit/switch in the UI.
 - Unified single-window feed merging live chat from Twitch, Kick, and YouTube.
-- Grid view: each platform's chat in its own panel, split evenly.
 - OBS integration:
-  - **Custom browser dock** — the app (unified or grid view) as a panel inside the OBS UI.
+  - **Custom browser dock** — the unified feed as a panel inside the OBS UI.
   - **Browser source overlay** — transparent-background chat rendered on stream.
 - Ships as a Docker image; runs on localhost, LAN, or cloud host.
 - No login required for anything in v1.
@@ -42,6 +41,7 @@ The app is read-only in v1: it displays messages but cannot send them. This keep
 - Moderation actions (timeouts, bans, deletes).
 - Message persistence, search, or analytics.
 - Third-party emotes (7TV/BTTV/FFZ) — fragment model accommodates them later.
+- **Grid view (side-by-side per-source panes).** Originally planned as a fallback for when merging wasn't possible; the server-side ingestion design makes the merge unconditional, so the fallback has no reason to exist. Not a feature. Revisit only if unified merging fails in practice.
 
 ## 3. Platform ingestion
 
@@ -100,7 +100,7 @@ No credentials anywhere. Upstream connections are keyed by platform+channel and 
 ```mermaid
 flowchart LR
   subgraph Container["Docker: SvelteKit app (adapter-node)"]
-    UI[UI: unified / grid / overlay]
+    UI[UI: unified feed / overlay]
     STREAM["/api/chat/stream (SSE)"]
     TW[Twitch IRC source]
     KW[Kick Pusher source]
@@ -165,25 +165,19 @@ This schema is the API contract for all clients (web, OBS, future mobile). Wire 
 - Ring buffer caps retained messages (default 1,000) to bound memory during long streams.
 - High-throughput safety: batch DOM appends per animation frame; virtualize if needed.
 
-### 4.3 Grid view
-
-- CSS grid, evenly split among the profile's sources — **one pane per source**, not per platform (a profile with two Twitch channels gets two Twitch panes).
-- Panes reuse the same feed component, filtered by `sourceId` — consistent styling, no iframes, no embed restrictions.
-- View toggle (Unified ⇄ Grid) in the header; choice persisted.
-
-### 4.4 OBS integration (MVP)
+### 4.3 OBS integration (MVP)
 
 Both shapes are plain URLs into the same app:
 
-- **Custom browser dock (panel in OBS):** OBS → Docks → Custom Browser Docks → paste app URL. Full interactive app (unified or grid) inside the OBS window. Nothing special required beyond sane behavior at narrow widths — responsive layout is a v1 requirement.
+- **Custom browser dock (panel in OBS):** OBS → Docks → Custom Browser Docks → paste app URL. Full interactive app inside the OBS window. Nothing special required beyond sane behavior at narrow widths — responsive layout is a v1 requirement.
 - **Browser source overlay (on stream):** `/?profile=gaming&overlay=1`. Overlay mode: transparent background, no chrome (no header/inputs), larger text with stroke/shadow for readability, optional per-message fade-out (`&fade=20` seconds). OBS browser sources support transparency natively.
 
-URL params reference a profile plus view options (`?profile=<idOrName>&view=unified|grid&overlay=1&fade=N`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
+URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1&fade=N`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
 
-### 4.5 Configuration & persistence
+### 4.4 Configuration & persistence
 
 - Profile manager screen: create/rename/delete profiles; within a profile, add/remove/reorder sources (platform picker + channel input + optional label). Adding a second source of the same platform is a normal, unremarkable action.
-- Profiles persist server-side (`/data/profiles.json`, §3.4). localStorage holds only per-device preferences (last-used profile, view mode).
+- Profiles persist server-side (`/data/profiles.json`, §3.4). localStorage holds only per-device preferences (e.g. last-used profile).
 - A "copy OBS URLs" helper emits ready-made dock/overlay links for the selected profile.
 - Restreamer users: the expectation is one profile per way-you-go-live, mirroring the output groups configured in the video stack.
 
@@ -203,9 +197,9 @@ URL params reference a profile plus view options (`?profile=<idOrName>&view=unif
         server/
           sources/        # ChatSource impls: twitch.ts, kick.ts, youtube.ts
           manager.ts      # refcounted source registry + SSE fan-out
-        components/       # feed, message, grid, overlay
+        components/       # feed, message, overlay
       routes/
-        +page.svelte      # main app (unified/grid)
+        +page.svelte      # main app (unified feed)
         api/...           # API routes (§3.4)
     static/
     Dockerfile            # multi-stage: build → slim node runtime
@@ -265,7 +259,7 @@ v1 ships the hooks so this bolts on without restructuring:
 
 ## 8. Roadmap
 
-- **v1 (this doc):** read-only unified feed + grid, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
+- **v1 (this doc):** read-only unified feed, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
 - **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD).
 - **Later:** native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
 
