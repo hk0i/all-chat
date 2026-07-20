@@ -14,14 +14,8 @@ import { privmsgToChatMessage } from './normalize';
 
 export const TWITCH_IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
 
-/** Minimal WebSocket surface used — satisfied by Node's global WebSocket. */
-export interface SocketLike {
-	addEventListener(type: 'open' | 'message' | 'close', listener: (event: { data?: unknown }) => void): void;
-	send(data: string): void;
-	close(): void;
-}
-
-export type SocketFactory = (url: string) => SocketLike;
+export type { SocketFactory, SocketLike } from '../socket';
+import { realSocketFactory, type SocketFactory, type SocketLike } from '../socket';
 
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
@@ -45,7 +39,7 @@ export class TwitchSource implements ChatSource {
 	constructor(
 		private readonly sourceId: string,
 		private readonly channel: string,
-		private readonly createSocket: SocketFactory = (url) => new WebSocket(url) as unknown as SocketLike
+		private readonly createSocket: SocketFactory = realSocketFactory
 	) {}
 
 	connect(): void {
