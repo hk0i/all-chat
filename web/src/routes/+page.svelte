@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
+	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
 	import { openChatStream } from '$lib/stream';
 	import { toggleTheme } from '$lib/theme';
 
@@ -13,6 +14,13 @@
 	let messages = $state<ChatMessage[]>([]);
 	let statuses = $state<Record<string, StatusEvent>>({});
 	let connected = $state(false);
+
+	/**
+	 * Platform icons + accent stripes, on by default; `&icons=0` disables
+	 * (overlay URLs) and the header toggle flips it live (EDD §3, display
+	 * options).
+	 */
+	let showIcons = $state(true);
 
 	let feedElement = $state<HTMLUListElement | undefined>();
 	/** False once the user scrolls up; new messages then pause instead of yanking the view. */
@@ -47,6 +55,7 @@
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
 		const params = page.url.searchParams;
+		showIcons = params.get('icons') !== '0';
 		if (!params.has('profile') && !params.has('source')) return;
 
 		const close = openChatStream(params.toString(), {
@@ -76,6 +85,7 @@
 				<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
 			{/each}
 			<a class="nav" href="/profiles">profiles</a>
+			<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
 			<button onclick={() => toggleTheme()}>theme</button>
 		</div>
 	</header>
@@ -90,8 +100,10 @@
 	<div class="feed-wrap">
 		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
 			{#each messages as message (message.id)}
-			<li>
-				<span class="author" style:color={message.author.color}
+			<li class={showIcons ? `striped platform-${message.platform}` : undefined}>
+				{#if showIcons}<PlatformIcon platform={message.platform} />{/if}<span
+					class="author"
+					style:color={message.author.color}
 					>{message.author.name}{#if message.author.login}
 						<span class="login">({message.author.login})</span>{/if}</span
 				>
@@ -220,6 +232,28 @@
 
 	.feed li {
 		padding: 0.15rem 0;
+	}
+
+	/* Platform accent stripe — brand colors, part of the icons option (EDD §3). */
+	.feed li.striped {
+		padding-left: 0.5rem;
+		border-left: 3px solid transparent;
+	}
+
+	.feed li.platform-twitch {
+		border-left-color: var(--platform-twitch);
+	}
+
+	.feed li.platform-kick {
+		border-left-color: var(--platform-kick);
+	}
+
+	.feed li.platform-youtube {
+		border-left-color: var(--platform-youtube);
+	}
+
+	button.off {
+		opacity: 0.5;
 	}
 
 	.author {
