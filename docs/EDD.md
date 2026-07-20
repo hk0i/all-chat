@@ -34,6 +34,7 @@ The app is read-only in v1: it displays messages but cannot send them. This keep
   - **Custom browser dock** — the unified feed as a panel inside the OBS UI.
   - **Browser source overlay** — transparent-background chat rendered on stream.
 - Ships as a Docker image; runs on localhost, LAN, or cloud host.
+- Dark mode: defaults to system preference, manual toggle persisted per device (§5).
 - No login required for anything in v1.
 
 ### Non-goals (v1, deferred to v2)
@@ -196,7 +197,7 @@ URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1
 ### 4.4 Configuration & persistence
 
 - Profile manager screen: create/rename/delete profiles; within a profile, add/remove/reorder sources (platform picker + channel input + optional label). Adding a second source of the same platform is a normal, unremarkable action.
-- Profiles persist server-side (`/data/profiles.json`, §3.4). localStorage holds only per-device preferences (e.g. last-used profile).
+- Profiles persist server-side (`/data/profiles.json`, §3.4). localStorage holds only per-device preferences (e.g. last-used profile, theme choice).
 - A "copy OBS URLs" helper emits ready-made dock/overlay links for the selected profile.
 - Restreamer users: the expectation is one profile per way-you-go-live, mirroring the output groups configured in the video stack.
 
@@ -204,7 +205,8 @@ URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1
 
 - **Framework:** SvelteKit + TypeScript, `adapter-node`. One app: UI + API routes. Svelte's compiled output keeps the feed hot path lean; the API surface is plain HTTP/SSE with nothing SvelteKit-specific in the contract.
 - **Streaming:** unified SSE endpoint (native `ReadableStream` response in a server route). Server-side WebSocket clients (`ws` package or Node's built-in `WebSocket`) for Twitch IRC and Kick Pusher.
-- **Styling:** hand-rolled [CSS](#def-css), dark theme default (streamers run dark UIs); transparent theme for overlay mode. No CSS framework.
+- **Styling:** hand-rolled [CSS](#def-css); light + dark themes via CSS custom properties, transparent theme for overlay mode. No CSS framework.
+- **Dark mode (v1 requirement):** streamers work in dim rooms at night — a bright default is hostile. Theme resolves in order: explicit user toggle (persisted per-device in localStorage) → `?theme=dark|light` URL param (for OBS dock URLs, where CEF's system-preference reporting can be unreliable) → `prefers-color-scheme` system setting → dark as final fallback. Toggle lives in the header; both themes are first-class and tested, not a dark theme with an inverted afterthought. Overlay mode ignores theming entirely (transparent background, stroke/shadow text).
 - **Testing:** Vitest for message parsers/normalizers, fixture-driven with recorded real payloads per platform. Parsers are the fragile surface; they get the coverage.
 
 ### 5.1 Backend language decision record (TypeScript/Node vs Go vs Swift; JSON vs protobuf)
