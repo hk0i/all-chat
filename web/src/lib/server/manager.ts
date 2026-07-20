@@ -1,6 +1,7 @@
 import type { ChatMessage, Platform, SourceConfig, SourceState, StatusEvent } from '@all-chat/contract';
 import type { ChatSource } from './sources/types';
 import { FakeSource } from './sources/fake';
+import { KickSource } from './sources/kick';
 import { TwitchSource } from './sources/twitch';
 
 export interface Subscriber {
@@ -28,8 +29,10 @@ const defaultCreateSource: CreateSource = (platform, sourceId, channel) => {
 	switch (platform) {
 		case 'twitch':
 			return new TwitchSource(sourceId, channel);
+		case 'kick':
+			return new KickSource(sourceId, channel);
 		default:
-			// Kick/YouTube land next; FakeSource keeps their pipeline exercisable.
+			// YouTube lands next; FakeSource keeps its pipeline exercisable.
 			return new FakeSource(sourceId, channel);
 	}
 };
