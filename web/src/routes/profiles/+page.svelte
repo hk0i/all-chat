@@ -33,7 +33,14 @@
 	let error = $state<string | undefined>();
 	let saving = $state(false);
 
-	const newKey = () => crypto.randomUUID();
+	/**
+	 * Not `crypto.randomUUID()` on purpose — that API only exists in secure
+	 * contexts (HTTPS or `localhost`), so it's silently undefined on a plain
+	 * `http://` LAN hostname and throws on click. This is just a client-only
+	 * Svelte #each key, not security-sensitive, so a counter is fine.
+	 */
+	let keySeq = 0;
+	const newKey = () => `k${++keySeq}`;
 
 	const CHANNEL_PLACEHOLDER: Record<Platform, string> = {
 		twitch: 'channel name',
