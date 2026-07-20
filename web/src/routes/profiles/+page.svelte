@@ -176,22 +176,26 @@
 	}
 
 	/**
-	 * Toggles whether `profile` is the target of the switchable overlay URL
-	 * (`/?overlay=1`, no `profile=`) — lets one fixed OBS Browser Source be
-	 * repointed at a different profile without editing the source in OBS.
+	 * Points the switchable overlay URL (`/?overlay=1`, no `profile=`) at
+	 * `profileId` — lets one fixed OBS Browser Source be repointed at a
+	 * different profile without editing the source in OBS.
 	 */
-	async function toggleOverlayProfile(profile: Profile) {
-		const nextId = overlayProfileId === profile.id ? null : profile.id;
+	async function setOverlayProfile(profileId: string | null) {
 		const response = await fetch('/api/overlay-profile', {
 			method: 'PUT',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ profileId: nextId })
+			body: JSON.stringify({ profileId })
 		});
 		if (!response.ok) {
 			error = ((await response.json()) as { message?: string }).message ?? response.statusText;
 			return;
 		}
-		overlayProfileId = nextId;
+		overlayProfileId = profileId;
+	}
+
+	/** Explicit per-row toggle — set/unset without leaving the page (manual override, kept alongside "watch" auto-setting it). */
+	async function toggleOverlayProfile(profile: Profile) {
+		await setOverlayProfile(overlayProfileId === profile.id ? null : profile.id);
 	}
 
 	async function remove(profile: Profile) {
@@ -250,7 +254,14 @@
 					<span class="summary">
 						{profile.sources.length} source{profile.sources.length === 1 ? '' : 's'}
 					</span>
-					<a class="watch" href="/?profile={profile.id}">watch</a>
+					<a
+						class="watch"
+						href="/?profile={profile.id}"
+						title="Read this chat profile and activate its overlay"
+						onclick={() => setOverlayProfile(profile.id)}
+					>
+						watch
+					</a>
 					<button
 						class:active={overlayProfileId === profile.id}
 						title="Target of the switchable overlay URL (/?overlay=1)"
