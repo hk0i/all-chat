@@ -7,8 +7,9 @@ The chat-side companion to a video multistream stack like
 
 Read the full design in [docs/EDD.md](docs/EDD.md).
 
-> **Status: scaffold.** Pipeline runs end to end against fake chat sources;
-> platform ingestion (Twitch/Kick/YouTube) is the next milestone.
+> **Status: v1.** Read-only unified feed, live against Twitch, Kick, and
+> YouTube, with a profile manager, OBS dock/overlay support, and dark/light
+> themes. No authentication yet — see the hosting note below.
 
 ## Run from a clone -- installing from source
 
@@ -45,6 +46,27 @@ volumes:
 > LAN-only or put them behind your reverse proxy's auth until in-app auth
 > (EDD §6.1) lands.
 
+## Using it
+
+Open the app and go to **Profiles** to create a named group of chat sources
+(any mix of Twitch/Kick/YouTube, duplicates of a platform allowed — e.g. two
+Twitch channels in one profile). Each profile gets:
+
+- **watch** — the merged feed at `/?profile=<id>`
+- **obs urls** — ready-made Dock and Overlay links for OBS
+
+You can also skip profiles entirely and connect ad hoc:
+`/?source=twitch:somechannel&source=kick:145222` (repeat `source=` for more).
+
+Display options ride the query string on any of the above:
+
+| Param | Default | Effect |
+|-------|---------|--------|
+| `icons=0` | on | Hide platform icons + accent stripe |
+| `avatars=0` / `avatars=1` | on (dock), off (overlay) | Author avatars / colored-initial discs |
+| `overlay=1` | off | Transparent, chrome-less, larger stroked text — OBS **browser source** |
+| `fade=N` | unset | In overlay mode, evict a message N seconds after it arrives |
+
 ## Develop
 
 ```sh
@@ -54,7 +76,7 @@ npm run check      # type checks (all workspaces)
 npm test           # unit tests
 ```
 
-Try the stream pipeline (fake sources for now):
+Try the stream pipeline against a live channel:
 `http://localhost:5173/?source=twitch:somechannel`
 
 ## Repository layout
