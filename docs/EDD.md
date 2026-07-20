@@ -226,14 +226,19 @@ Evaluated for minimal system requirements, considered and settled:
         server/
           sources/        # ChatSource impls: twitch.ts, kick.ts, youtube.ts
           manager.ts      # refcounted source registry + SSE fan-out
-        components/       # feed, message, overlay
+        stream.ts         # client-side SSE consumer + feed state
+        components/
+          feed/           # Feed, MessageRow, BadgeStrip, EmoteFragment, AvatarDisc, ...
+          profiles/       # ProfileManager, ProfileEditor, SourceRow, ObsUrlHelper
+          ui/             # shared primitives: Icon, Toggle, StatusDot
       routes/
-        +page.svelte      # main app (unified feed)
+        +page.svelte      # main app (unified feed; overlay is a display variant)
         api/...           # API routes (§3.4)
     static/
     Dockerfile            # multi-stage: build → slim node runtime
     .github/workflows/    # CI: check, test, build, publish image to GHCR
   ```
+- **Component organization:** shallow scenario grouping, one level deep — `feed/` (hot path) and `profiles/` (forms) are the only two real UI scenarios; `ui/` holds shared primitives. Overlay mode is a feed display variant, not a scenario. No deeper nesting, no barrel files; routes already separate scenarios at the page level. Revisit only if a genuine third scenario lands (e.g. a moderation UI).
 
 ## 6. Deployment
 
