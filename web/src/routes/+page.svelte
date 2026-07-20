@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
+	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
 	import { openChatStream } from '$lib/stream';
 	import { toggleTheme } from '$lib/theme';
@@ -114,6 +115,8 @@
 			<li class={showIcons ? `striped platform-${message.platform}` : undefined}>
 				{#if showIcons}<PlatformIcon platform={message.platform} />{/if}{#if showAvatars}<AvatarDisc
 						author={message.author}
+					/>{/if}{#if message.author.badges.length}<BadgeStrip
+						badges={message.author.badges}
 					/>{/if}<span
 					class="author"
 					style:color={message.author.color}
