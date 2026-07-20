@@ -248,8 +248,11 @@
 
 	<ul class="profiles">
 		{#each profiles as profile (profile.id)}
-			<li class="profile" class:editing={draft?.id === profile.id}>
+			<li class="profile" class:editing={draft?.id === profile.id}
+				class:active={draft?.id === undefined && overlayProfileId === profile.id}
+			>
 				<div class="profile-row">
+					<span class="active-indicator" aria-hidden="true">{overlayProfileId === profile.id ? '★' : ''}</span>
 					<span class="name">{profile.name}</span>
 					<span class="summary">
 						{profile.sources.length} source{profile.sources.length === 1 ? '' : 's'}
@@ -262,13 +265,6 @@
 					>
 						watch
 					</a>
-					<button
-						class:active={overlayProfileId === profile.id}
-						title="Target of the switchable overlay URL (/?overlay=1)"
-						onclick={() => toggleOverlayProfile(profile)}
-					>
-						{overlayProfileId === profile.id ? '★ overlay' : 'set as overlay'}
-					</button>
 					<button
 						onclick={() => (obsOpenId = obsOpenId === profile.id ? undefined : profile.id)}
 					>
@@ -547,7 +543,7 @@
 		cursor: default;
 	}
 
-	button.active {
+	.active {
 		border-color: var(--accent);
 		color: var(--accent);
 	}
