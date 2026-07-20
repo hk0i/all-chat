@@ -1,5 +1,8 @@
 import type { Badge, BadgeKind, ChatMessage, Fragment } from '@all-chat/contract';
+import { hashColor } from '../color';
 import { loginFromPrefix, type IrcLine } from './irc';
+
+export { hashColor };
 
 /** Twitch emote CDN — public, no auth (EDD §4.1). */
 const emoteUrl = (id: string) => `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/2.0`;
@@ -12,13 +15,6 @@ const BADGE_KINDS: Record<string, BadgeKind> = {
 	vip: 'vip',
 	partner: 'verified'
 };
-
-/** Stable fallback hue for users who never set a chat color (EDD §4.1). */
-export function hashColor(name: string): string {
-	let hash = 0;
-	for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-	return `hsl(${((hash % 360) + 360) % 360}, 60%, 60%)`;
-}
 
 function parseBadges(badgesTag: string | undefined, badgeInfoTag: string | undefined): Badge[] {
 	if (!badgesTag) return [];
