@@ -21,6 +21,12 @@ interface Thumbnail {
 	width?: number;
 }
 
+/**
+ * One segment of a chat message in YouTube's "runs" format: message text is
+ * an ordered array of runs, each either plain text (`{ text }`) or an emoji
+ * (`{ emoji }`). "hi 🎉 [custom]" arrives as three runs. Same structure
+ * YouTube uses for all rich text (titles, descriptions), reused by chat.
+ */
 interface YtRun {
 	text?: string;
 	emoji?: {
