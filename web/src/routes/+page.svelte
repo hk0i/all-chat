@@ -30,6 +30,19 @@
 	 */
 	let showAvatars = $state(true);
 
+	/**
+	 * Platforms with more than one live source in the current view — e.g. two
+	 * Twitch channels in one profile. The platform icon alone can't tell them
+	 * apart, so those messages also get a channel tag (EDD §3).
+	 */
+	let duplicatePlatforms = $derived.by(() => {
+		const counts = new Map<string, number>();
+		for (const status of Object.values(statuses)) {
+			counts.set(status.platform, (counts.get(status.platform) ?? 0) + 1);
+		}
+		return new Set([...counts].filter(([, count]) => count > 1).map(([platform]) => platform));
+	});
+
 	let feedElement = $state<HTMLUListElement | undefined>();
 	/** False once the user scrolls up; new messages then pause instead of yanking the view. */
 	let stickToBottom = $state(true);
@@ -113,7 +126,11 @@
 		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
 			{#each messages as message (message.id)}
 			<li class={showIcons ? `striped platform-${message.platform}` : undefined}>
-				{#if showIcons}<PlatformIcon platform={message.platform} />{/if}{#if showAvatars}<AvatarDisc
+				{#if showIcons}<PlatformIcon
+						platform={message.platform}
+					/>{#if duplicatePlatforms.has(message.platform)}<span class="source-tag"
+							>{message.channel}</span
+						>{/if}{/if}{#if showAvatars}<AvatarDisc
 						author={message.author}
 					/>{/if}{#if message.author.badges.length}<BadgeStrip
 						badges={message.author.badges}
@@ -270,6 +287,12 @@
 
 	button.off {
 		opacity: 0.5;
+	}
+
+	.source-tag {
+		font-size: 0.7em;
+		color: var(--text-muted);
+		margin-right: 0.35rem;
 	}
 
 	.author {
