@@ -6,6 +6,13 @@ import type { PageLoad } from './$types';
  * this page exercises the exact surface native clients use (EDD §3.2).
  */
 export const load: PageLoad = async ({ fetch }) => {
-	const response = await fetch('/api/profiles');
-	return { profiles: (await response.json()) as Profile[] };
+	const [profilesResponse, overlayResponse] = await Promise.all([
+		fetch('/api/profiles'),
+		fetch('/api/overlay-profile')
+	]);
+	const { profileId } = (await overlayResponse.json()) as { profileId: string | null };
+	return {
+		profiles: (await profilesResponse.json()) as Profile[],
+		overlayProfileId: profileId
+	};
 };

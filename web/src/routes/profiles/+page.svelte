@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Platform, Profile } from '@all-chat/contract';
+	import { page } from '$app/state';
 	import { toggleTheme } from '$lib/theme';
 
 	let { data } = $props();
@@ -7,6 +8,9 @@
 	/* Local working copy on purpose: mutations land via API calls below, not re-runs of load. */
 	// svelte-ignore state_referenced_locally
 	let profiles = $state<Profile[]>(data.profiles);
+	/** Which profile the profile-agnostic overlay URL (`/?overlay=1`, no `profile=`) currently resolves to. */
+	// svelte-ignore state_referenced_locally
+	let overlayProfileId = $state<string | null>(data.overlayProfileId);
 
 	/**
 	 * Source row being edited. `id` is absent on newly added rows — the server
@@ -171,6 +175,25 @@
 		}, 1500);
 	}
 
+	/**
+	 * Toggles whether `profile` is the target of the switchable overlay URL
+	 * (`/?overlay=1`, no `profile=`) — lets one fixed OBS Browser Source be
+	 * repointed at a different profile without editing the source in OBS.
+	 */
+	async function toggleOverlayProfile(profile: Profile) {
+		const nextId = overlayProfileId === profile.id ? null : profile.id;
+		const response = await fetch('/api/overlay-profile', {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ profileId: nextId })
+		});
+		if (!response.ok) {
+			error = ((await response.json()) as { message?: string }).message ?? response.statusText;
+			return;
+		}
+		overlayProfileId = nextId;
+	}
+
 	async function remove(profile: Profile) {
 		if (!confirm(`Delete profile "${profile.name}"?`)) return;
 		error = undefined;
@@ -181,6 +204,7 @@
 		}
 		profiles = profiles.filter((p) => p.id !== profile.id);
 		if (draft?.id === profile.id) draft = undefined;
+		if (overlayProfileId === profile.id) overlayProfileId = null;
 	}
 </script>
 
@@ -198,6 +222,26 @@
 		<p class="error" role="alert">{error}</p>
 	{/if}
 
+	<section class="switchable-overlay">
+		<div class="obs-row">
+			<span class="obs-title">Switchable overlay</span>
+			<code class="obs-url">{page.url.origin}/?overlay=1</code>
+			<button onclick={() => copyUrl(`${page.url.origin}/?overlay=1`)}>
+				{copiedUrl === `${page.url.origin}/?overlay=1` ? 'copied ✓' : 'copy'}
+			</button>
+		</div>
+		<p class="obs-hint">
+			OBS → Sources → Browser. One fixed URL — set it once, then use the
+			<strong>overlay</strong> toggle below to change which profile it shows, without editing the
+			source in OBS.
+			{#if overlayProfileId}
+				Currently: <strong>{profiles.find((p) => p.id === overlayProfileId)?.name ?? overlayProfileId}</strong>.
+			{:else}
+				Currently: <em>none selected</em>.
+			{/if}
+		</p>
+	</section>
+
 	<ul class="profiles">
 		{#each profiles as profile (profile.id)}
 			<li class="profile" class:editing={draft?.id === profile.id}>
@@ -207,6 +251,13 @@
 						{profile.sources.length} source{profile.sources.length === 1 ? '' : 's'}
 					</span>
 					<a class="watch" href="/?profile={profile.id}">watch</a>
+					<button
+						class:active={overlayProfileId === profile.id}
+						title="Target of the switchable overlay URL (/?overlay=1)"
+						onclick={() => toggleOverlayProfile(profile)}
+					>
+						{overlayProfileId === profile.id ? '★ overlay' : 'set as overlay'}
+					</button>
 					<button
 						onclick={() => (obsOpenId = obsOpenId === profile.id ? undefined : profile.id)}
 					>
@@ -338,11 +389,18 @@
 		gap: 0.5rem;
 	}
 
-	.profile {
+	.profile,
+	.switchable-overlay {
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		padding: 0.5rem 0.75rem;
+	}
+
+	.switchable-overlay {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 
 	.profile.editing {
@@ -476,6 +534,11 @@
 	button:disabled {
 		opacity: 0.5;
 		cursor: default;
+	}
+
+	button.active {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 
 	button.primary {

@@ -30,6 +30,10 @@
 	let hasParams = $state(false);
 	/** Set when the stream connection fails permanently (see stream.ts onError). */
 	let streamError = $state<string | undefined>();
+	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
+	let overlayNoProfile = $state(false);
+	/** Polling interval — how often a profile-agnostic overlay re-checks which profile it should show. */
+	const OVERLAY_POINTER_POLL_MS = 5000;
 
 	/**
 	 * Platform icons + accent stripes, on by default; `&icons=0` disables
@@ -166,10 +170,11 @@
 		}
 		if (fadeSeconds !== undefined) fadeSweepHandle = setInterval(sweepExpired, 1000);
 
-		hasParams = params.has('profile') || params.has('source');
 		let closeStream: (() => void) | undefined;
-		if (hasParams) {
-			closeStream = openChatStream(params.toString(), {
+
+		function connectStream(streamParams: URLSearchParams) {
+			closeStream?.();
+			closeStream = openChatStream(streamParams.toString(), {
 				onHello: () => (connected = true),
 				onMessage: (message) => {
 					messageBuffer.push(message);
@@ -185,10 +190,54 @@
 			});
 		}
 
+		const explicitTarget = params.has('profile') || params.has('source');
+		hasParams = explicitTarget;
+
+		let pointerPollHandle: ReturnType<typeof setInterval> | undefined;
+
+		if (explicitTarget) {
+			connectStream(params);
+		} else if (overlayMode) {
+			// Profile-agnostic overlay: one fixed OBS URL, switchable from the
+			// Profiles page without touching the source in OBS (EDD §3).
+			// `undefined` = not checked yet, distinct from an actual `null` pointer
+			// (nothing selected) — otherwise a pointer that's null on the very
+			// first check never triggers the "no profile selected" state below.
+			let activeProfileId: string | null | undefined;
+
+			const applyPointer = (profileId: string | null) => {
+				if (activeProfileId !== undefined && profileId === activeProfileId) return;
+				activeProfileId = profileId;
+				overlayNoProfile = !profileId;
+				closeStream?.();
+				closeStream = undefined;
+				messages = [];
+				statuses = {};
+				connected = false;
+				streamError = undefined;
+				messageBuffer = [];
+				receivedAt.clear();
+				if (!profileId) return;
+				const target = new URLSearchParams(params);
+				target.set('profile', profileId);
+				connectStream(target);
+			};
+
+			const checkPointer = () =>
+				fetch('/api/overlay-profile')
+					.then((response) => response.json())
+					.then((data: { profileId: string | null }) => applyPointer(data.profileId))
+					.catch(() => {});
+
+			checkPointer();
+			pointerPollHandle = setInterval(checkPointer, OVERLAY_POINTER_POLL_MS);
+		}
+
 		return () => {
 			closeStream?.();
 			if (flushHandle !== undefined) cancelAnimationFrame(flushHandle);
 			if (fadeSweepHandle !== undefined) clearInterval(fadeSweepHandle);
+			if (pointerPollHandle !== undefined) clearInterval(pointerPollHandle);
 		};
 	});
 </script>
@@ -215,7 +264,11 @@
 
 	{#if streamError}
 		<p class="error-banner" role="alert">Couldn't connect: {streamError}</p>
-	{:else if !hasParams}
+	{:else if overlayMode && overlayNoProfile}
+		<p class="hint">
+			No overlay profile selected — pick one from <a href="/profiles">Profiles</a>.
+		</p>
+	{:else if !hasParams && !overlayMode}
 		<p class="hint">
 			Pass <code>?source=twitch:somechannel</code> (repeatable) or <code>?profile=name</code> to
 			connect.
