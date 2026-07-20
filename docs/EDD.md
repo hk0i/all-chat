@@ -241,6 +241,7 @@ Single-user by design — one streamer per deployment. No multi-user, no roles, 
 Behavior:
 
 - **Auth is off until configured.** No password set → open access (the localhost/LAN default, matching how Restreamer-adjacent tools behave). Password set → everything locked except `GET /api/health`.
+- **Sending chat from the OBS dock (v2) uses the session cookie, not a URL token.** This matches industry practice: OBS docks are real embedded Chromium (CEF) with their own persistent cookie store (survives OBS restarts), and Twitch popout chat, Restream's `chat.restream.io` dock, and Streamlabs all handle send-capable OBS panels via in-dock login. Tokenized URLs appear across those products only for display-only browser-source widgets (Streamlabs `widgets/chat-box/<token>`, Restream's "embed in stream" URL) — exactly the split in the table above. Practical consequence: sessions must be long-lived with refresh-on-use (e.g. 90 days) so the streamer logs into the dock once, not every stream. Our login is a plain first-party password form, so CEF's known flakiness with third-party OAuth popups doesn't apply.
 - The "copy OBS URLs" helper mints/embeds a URL token automatically when auth is on.
 - URL tokens are the one deliberate compromise (tokens in query strings can leak via logs); they are scoped read-only, per-source revocable, and only exist because OBS browser sources cannot present cookies or headers.
 - Cookie sessions: `HttpOnly`, `SameSite=Lax`; HTTPS/`Secure` expected to come from the user's reverse proxy — the app itself does not terminate TLS.
@@ -265,7 +266,7 @@ v1 ships the hooks so this bolts on without restructuring:
 ## 8. Roadmap
 
 - **v1 (this doc):** read-only unified feed + grid, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
-- **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD).
+- **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD).
 - **Later:** native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
 
 ## 9. Open questions
