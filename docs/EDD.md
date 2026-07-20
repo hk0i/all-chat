@@ -175,8 +175,9 @@ This schema is the API contract for all clients (web, OBS, future mobile). Wire 
 ### 4.2 Unified feed behavior
 
 - Messages append in arrival order (not timestamp-sorted — re-sorting causes visual jumping).
-- Each message shows a platform icon + platform accent color stripe; when a profile contains multiple sources on the same platform, the source label (or channel name) is shown too, so `twitch/gmpekk` and `twitch/gmpekk` are distinguishable at a glance.
+- **Platform icons are a display option, on by default** (UI toggle; `&icons=0` to disable on overlay URLs): each message is prefixed with the icon of the platform it came from (before the avatar/name), plus a platform accent color stripe on the message row. When a profile contains multiple sources on the same platform, the source label (or channel name) is shown too, so `twitch/gmpekk` and `twitch/gmpekk` are distinguishable at a glance.
 - **Avatars are a display option** (UI toggle; `&avatars=1` on overlay URLs): author photo where `avatarUrl` is present, colored-initial disc where it isn't (§4.1). Off by default in overlay mode (visual noise on stream), on by default in the dock/browser.
+- Message row anatomy, with everything on: `[platform icon] [avatar] [badges] [author name] message` — icons and avatars each independently togglable, so any combination renders cleanly.
 - Auto-scroll with "paused — N new messages" pill when the user scrolls up.
 - Ring buffer caps retained messages (default 1,000) to bound memory during long streams.
 - High-throughput safety: batch DOM appends per animation frame; virtualize if needed.
@@ -188,7 +189,7 @@ Both shapes are plain URLs into the same app:
 - **Custom browser dock (panel in OBS):** OBS → Docks → Custom Browser Docks → paste app URL. Full interactive app inside the OBS window. Nothing special required beyond sane behavior at narrow widths — responsive layout is a v1 requirement.
 - **Browser source overlay (on stream):** `/?profile=gaming&overlay=1`. Overlay mode: transparent background, no chrome (no header/inputs), larger text with stroke/shadow for readability, optional per-message fade-out (`&fade=20` seconds). OBS browser sources support transparency natively.
 
-URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1&fade=N&avatars=1`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
+URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1&fade=N&avatars=1&icons=0`). Because profiles live server-side, editing a profile updates every OBS dock/source that references it — no URL surgery after the first setup.
 
 ### 4.4 Configuration & persistence
 
