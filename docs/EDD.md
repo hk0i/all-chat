@@ -240,6 +240,37 @@ Evaluated for minimal system requirements, considered and settled:
     Dockerfile            # multi-stage: build → slim node runtime
     .github/workflows/    # CI: check, test, build, publish image to GHCR
   ```
+### 5.2 Color palette & design tokens
+
+Source of truth: the [onebigfunction-library Figma file](https://www.figma.com/design/19qUm3VYRFgzSBZr35vxzW/onebigfunction-library?node-id=312-3) (private — the link is a provenance pointer, not access; keep the file's sharing set to invite-only, and all values are exported below so this doc stands alone) — a palette loosely based on [Tango](https://en.wikipedia.org/wiki/Tango_Desktop_Project). Values below were exported from Figma variables and become CSS custom properties in a single `tokens.css`.
+
+| Scale | Tango root | 50 | 300 | 500 | 700 (Main) | 900 |
+|-------|-----------|----|-----|-----|------------|-----|
+| Primary | Orange | `#FCE2BD` | `#FCC97E` | `#FCAF3E` | `#F57900` | `#CE5C00` |
+| Secondary | Plum | `#FFEDFD` | `#E0BADC` | `#AD7FA8` | `#75507B` | `#5C3566` |
+| Success | Chameleon | `#D4FFAB` | `#AFF26D` | `#8AE234` | `#73D216` | `#4E9A06` |
+| Warning | Butter | `#FFF49C` | `#FCED74` | `#FCE94F` | `#EDD400` | `#C4A000` |
+| Error | Scarlet Red | `#FFC4C4` | `#FA7575` | `#EF2929` | `#CC0000` | `#A40000` |
+
+Neutral ramp (blue-tinted): `50 #F2F8FF · 100 #D9EAFF · 200 #BFDCFF · 300 #A7CEFF · 400 #7590B2 · 500 #546880 · 600 #333F4E · 700 #232B36 · 800 #12161C · 900 #000000`.
+
+Semantic token mapping (the components only ever use semantic tokens, never raw scale values):
+
+| Token | Dark theme | Light theme |
+|-------|-----------|-------------|
+| `--bg` | Neutral/800 | Neutral/50 |
+| `--surface` (cards, header) | Neutral/700 | Key/White |
+| `--border` | Neutral/600 | Neutral/200 |
+| `--text` | Neutral/100 | Neutral/800 |
+| `--text-muted` | Neutral/400 | Neutral/500 |
+| `--accent` (buttons, links, focus) | Primary/500 | Primary/700 |
+| `--accent-hover` | Primary/300 | Primary/900 |
+| `--status-live` | Success/500 | Success/900 |
+| `--status-reconnecting` | Warning/500 | Warning/900 |
+| `--status-failed` | Error/500 | Error/700 |
+
+Status tokens drive the per-source connection indicators (§4). Secondary/Plum is reserved for highlight treatments (e.g. future message-highlight/mention styling). **Platform identity colors are not part of this palette** — the platform icon/stripe colors stay the platforms' own brand colors (Twitch purple, Kick green, YouTube red) so sources read instantly; the Tango palette styles everything that is *ours*.
+
 - **Component organization:** shallow scenario grouping, one level deep — `feed/` (hot path) and `profiles/` (forms) are the only two real UI scenarios; `ui/` holds shared primitives. Overlay mode is a feed display variant, not a scenario. No deeper nesting, no barrel files; routes already separate scenarios at the page level. Revisit only if a genuine third scenario lands (e.g. a moderation UI).
 
 ## 6. Deployment
