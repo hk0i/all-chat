@@ -284,7 +284,7 @@ Status tokens drive the per-source connection indicators (§4). Secondary/Plum i
 **Primary: Docker image** ([GHCR](#def-ghcr), GitHub Container Registry), run on the streamer's machine, home server/LAN, or any cloud host:
 
 ```sh
-docker run -p 8420:3000 -v allchat-data:/data ghcr.io/<owner>/all-chat
+docker run -p 8420:3000 -v allchat-data:/data ghcr.io/hk0i/all-chat
 ```
 
 Then `http://localhost:8420` (or the LAN/cloud host) in a browser and in OBS dock/source URLs. The `/data` volume holds `profiles.json`. Drops straight into a `docker-compose.yml` next to Restreamer; a sample compose file ships in the repo.
@@ -312,7 +312,7 @@ volumes:
 
 This is also the TLS story: nginx-proxy (with its acme companion) terminates HTTPS, per §6.1's assumption that the app never terminates TLS itself.
 
-The repo's `docker-compose.yml` always builds from the local `Dockerfile` (`build: .`) so a clone runs the code it contains; the README documents the production variant that pulls `ghcr.io/<owner>/all-chat` instead. Same file shape, one line different.
+The repo's `docker-compose.yml` always builds from the local `Dockerfile` (`build: .`) so a clone runs the code it contains; the README documents the production variant that pulls `ghcr.io/hk0i/all-chat` instead. Same file shape, one line different.
 
 **Docker file placement:** `Dockerfile`, `docker-compose.yml`, and `.dockerignore` live at the repo root — compose's CLI convention (`docker compose up` with no `-f`) and the monorepo build context (root, spanning `shared/` + `web/`) both want them there. If docker assets multiply (dev compose, bot stack, proxy variants), the variants move to a `docker/` directory; the primary `docker-compose.yml` stays at root.
 
