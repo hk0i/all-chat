@@ -289,6 +289,33 @@ docker run -p 8420:3000 -v allchat-data:/data ghcr.io/<owner>/all-chat
 
 Then `http://localhost:8420` (or the LAN/cloud host) in a browser and in OBS dock/source URLs. The `/data` volume holds `profiles.json`. Drops straight into a `docker-compose.yml` next to Restreamer; a sample compose file ships in the repo.
 
+**Reverse-proxy deployment (`jwilder/nginx-proxy`):** the shipped compose file supports joining an existing nginx-proxy setup — service exposes port 3000 (no host port published), advertises itself via `VIRTUAL_HOST`/`VIRTUAL_PORT` (defaulting to `all-chat.localhost` — the `.localhost` TLD is reserved by RFC 6761 and browsers resolve `*.localhost` to loopback with no hosts-file setup, so local proxy testing works out of the box), and joins an external network whose name is configurable as `${PROXY_NETWORK:-proxy_network}`:
+
+```yaml
+services:
+  allchat:
+    build: .
+    expose: ["3000"]
+    environment:
+      VIRTUAL_HOST: ${ALLCHAT_HOST:-all-chat.localhost}
+      VIRTUAL_PORT: "3000"
+    volumes:
+      - allchat-data:/data
+    networks: [proxy]
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-proxy_network}
+volumes:
+  allchat-data:
+```
+
+This is also the TLS story: nginx-proxy (with its acme companion) terminates HTTPS, per §6.1's assumption that the app never terminates TLS itself.
+
+The repo's `docker-compose.yml` always builds from the local `Dockerfile` (`build: .`) so a clone runs the code it contains; the README documents the production variant that pulls `ghcr.io/<owner>/all-chat` instead. Same file shape, one line different.
+
+**Docker file placement:** `Dockerfile`, `docker-compose.yml`, and `.dockerignore` live at the repo root — compose's CLI convention (`docker compose up` with no `-f`) and the monorepo build context (root, spanning `shared/` + `web/`) both want them there. If docker assets multiply (dev compose, bot stack, proxy variants), the variants move to a `docker/` directory; the primary `docker-compose.yml` stays at root.
+
 Also runs bare with Node (`npm run build && node build/`) for non-Docker users.
 
 **Not pursued for v1:** static-only GitHub Pages build. YouTube ingestion requires the server, and shipping a degraded Twitch/Kick-only tier adds a second build target and support burden for little value. Revisit if demand appears.
