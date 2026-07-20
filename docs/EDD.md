@@ -278,9 +278,47 @@ v1 ships the hooks so this bolts on without restructuring:
 
 - **v1 (this doc):** read-only unified feed, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
 - **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream; works from the OBS dock via session cookie, §6.1); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD); Twitch/Kick avatar enrichment (server-side lookup + cache, §4.1).
-- **Later:** native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
+- **Later:** chatbot as a separate service consuming the API (§9); native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
 
-## 9. Open questions
+## 9. Ecosystem: chatbot and other integrations
+
+All Chat is deliberately **not** extensible in-process — no plugin loader, no extension API inside the app. The HTTP API is the extension surface. Anything that wants chat (a bot, a logger, a TTS reader, analytics) is an API client with the same standing as the web UI, OBS views, or a mobile app. This keeps the core small and makes integrations crash-isolated, independently deployable, and language-agnostic by construction.
+
+### 9.1 All Chat as the chat gateway
+
+The planned chatbot (separate project) is the first proof of this shape:
+
+```mermaid
+flowchart LR
+  subgraph Stack["docker compose stack (next to Restreamer)"]
+    AC[all-chat\nchat gateway]
+    BOT[all-chat-bot\nbehavior + plugins]
+  end
+  Platforms[(Twitch / Kick / YouTube)] <--> AC
+  AC -- "SSE /api/chat/stream (read)" --> BOT
+  BOT -- "POST /api/chat/send (v2, write token)" --> AC
+```
+
+- **Read path (works against v1 as-is):** the bot subscribes to `/api/chat/stream?profile=<x>` and receives every platform normalized — it never implements platform ingestion.
+- **Write path (v2):** the bot calls the same send endpoint every other client uses, authenticated with a write-scoped bearer token (§6.1). All Chat fans the message out to the profile's platforms.
+- **Credential boundary:** platform OAuth lives only in All Chat. The bot holds one credential: its All Chat token. Revoking that token severs the bot completely.
+- Separate repo, separate Docker image (`all-chat-bot`), same compose stack. The bot executes user-written code and should crash, update, and restart without touching the gateway.
+
+### 9.2 What the bot owns (design sketch — full EDD lives in the bot's repo)
+
+- Command handling (`!uptime`, `!so`), timers, moderation logic, personality — all behavior.
+- **Homebrew plugin system:** user plugins as JS/TS modules in a mounted `/data/plugins` directory; event-hook API (`onMessage(msg, ctx)`, command registry, scheduled hooks, `ctx.reply(...)`). Plugins run with full process privileges — self-hosted, the user runs their own code; documented, not sandboxed. Sandboxing/permissions only if a community plugin-sharing ecosystem ever emerges.
+- Plugin authors get All Chat's normalized `ChatMessage` shape (§4.1) — one message format regardless of platform, `sourceId` included for per-channel behavior.
+
+### 9.3 Gateway guarantees the ecosystem relies on
+
+Already in the v1 design, listed here as commitments:
+
+- SSE stream is multi-consumer (refcounted fan-out) — N integrations cost nothing extra upstream.
+- The message schema is versioned (`hello` event / `X-AllChat-API` header, §4.1) — integrations detect drift instead of silently breaking.
+- Bearer tokens are per-client and scoped (§6.1) — each integration gets its own revocable credential.
+
+## 10. Open questions
 
 1. Overlay styling surface for v1: just size/fade params, or a small theme editor? Leaning params-only; theming is a rabbit hole.
 2. YouTube poller sharing: refcount per video is designed in — is multi-client (streamer's browser + OBS dock + overlay all connected at once) the common case? Yes, likely three concurrent clients; SSE fan-out from one poller handles it.
