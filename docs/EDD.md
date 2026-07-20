@@ -226,7 +226,30 @@ Also runs bare with Node (`npm run build && node build/`) for non-Docker users.
 
 **Not pursued for v1:** static-only GitHub Pages build. YouTube ingestion requires the server, and shipping a degraded Twitch/Kick-only tier adds a second build target and support burden for little value. Revisit if demand appears.
 
-Security note: the server exposes only stateless read-only routes, but a public deployment is an open chat-relay anyone can point at any channel; if hosted publicly, put it behind basic auth or keep it LAN-only. Documented in the README rather than solved in-app for v1 (a simple bearer-token option is a natural v2 addition once mobile clients need remote access anyway).
+Security note: in v1 the server exposes only stateless read-only routes plus profile CRUD, but a public deployment is an open chat-relay anyone can point at any channel and a control panel anyone can edit; if hosted publicly before v2 auth lands, put it behind a reverse proxy with basic auth or keep it LAN-only. Documented in the README. The in-app auth design is §6.1.
+
+### 6.1 Auth for cloud hosting (v2 design, v1 hooks)
+
+Single-user by design — one streamer per deployment. No multi-user, no roles, no third-party OAuth/OIDC provider. Three credentials for three client shapes:
+
+| Credential | Who uses it | Grants | Storage |
+|-----------|-------------|--------|---------|
+| Admin password → session cookie | Interactive browsers + OBS **dock** (a real browser; cookie login works) | Everything: control panel, profile CRUD, token management | Password hash (argon2id) in `/data/config.json`; set via `ALLCHAT_PASSWORD` env or first-run setup |
+| Bearer token | Headless API clients (future native mobile app) | Read stream + read profiles; optionally write, per-token flag | Generated in control panel, stored hashed in `/data` |
+| Read-only URL token | OBS **browser source** overlay (cannot perform login flows) | Page load + chat stream only — useless for CRUD | Rides the query string: `/?profile=gaming&overlay=1&token=<t>`; revocable per-token from the control panel |
+
+Behavior:
+
+- **Auth is off until configured.** No password set → open access (the localhost/LAN default, matching how Restreamer-adjacent tools behave). Password set → everything locked except `GET /api/health`.
+- The "copy OBS URLs" helper mints/embeds a URL token automatically when auth is on.
+- URL tokens are the one deliberate compromise (tokens in query strings can leak via logs); they are scoped read-only, per-source revocable, and only exist because OBS browser sources cannot present cookies or headers.
+- Cookie sessions: `HttpOnly`, `SameSite=Lax`; HTTPS/`Secure` expected to come from the user's reverse proxy — the app itself does not terminate TLS.
+
+v1 ships the hooks so this bolts on without restructuring:
+
+- All requests already pass through one SvelteKit `handle` hook — the single auth choke point exists day one as a pass-through.
+- The stream route and page loads accept-and-ignore a `?token=` param from day one, so v1-era OBS URLs survive the v2 upgrade.
+- Auth state joins `profiles.json` in `/data` — no new storage mechanism.
 
 ## 7. Risks
 
@@ -242,7 +265,7 @@ Security note: the server exposes only stateless read-only routes, but a public 
 ## 8. Roadmap
 
 - **v1 (this doc):** read-only unified feed + grid, Twitch/Kick/YouTube, OBS dock + overlay, Docker deploy.
-- **v2:** per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream); Facebook Live support (auth unlocks Graph API); bearer-token auth for remote/mobile access; moderation passthrough (TBD).
+- **v2:** app auth for cloud hosting (§6.1: admin password, bearer tokens, OBS URL tokens); per-platform OAuth; send messages from a unified input to all connected platforms (POST endpoints beside the stream); Facebook Live support (platform auth unlocks Graph API); moderation passthrough (TBD).
 - **Later:** native mobile client (thin SSE consumer of the same API — single-screen users get chat on a phone/tablet beside their setup), third-party emotes (7TV/BTTV/FFZ), multi-channel-per-platform, message filtering/highlighting, custom overlay theming.
 
 ## 9. Open questions
