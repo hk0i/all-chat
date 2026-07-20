@@ -7,9 +7,42 @@
 
 	const MAX_MESSAGES = 1000;
 
+	/** How close to the bottom (px) still counts as "at the bottom". */
+	const STICK_THRESHOLD_PX = 40;
+
 	let messages = $state<ChatMessage[]>([]);
 	let statuses = $state<Record<string, StatusEvent>>({});
 	let connected = $state(false);
+
+	let feedElement = $state<HTMLUListElement | undefined>();
+	/** False once the user scrolls up; new messages then pause instead of yanking the view. */
+	let stickToBottom = $state(true);
+	let missedCount = $state(0);
+
+	function onFeedScroll() {
+		if (!feedElement) return;
+		const distanceFromBottom =
+			feedElement.scrollHeight - feedElement.scrollTop - feedElement.clientHeight;
+		const atBottom = distanceFromBottom <= STICK_THRESHOLD_PX;
+		if (atBottom && !stickToBottom) missedCount = 0;
+		stickToBottom = atBottom;
+	}
+
+	function resumeScroll() {
+		stickToBottom = true;
+		missedCount = 0;
+		scrollToBottom();
+	}
+
+	function scrollToBottom() {
+		if (feedElement) feedElement.scrollTop = feedElement.scrollHeight;
+	}
+
+	// Keep pinned to the newest message unless the user scrolled up.
+	$effect(() => {
+		void messages.length;
+		if (stickToBottom) scrollToBottom();
+	});
 
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
@@ -20,6 +53,7 @@
 			onHello: () => (connected = true),
 			onMessage: (message) => {
 				messages = [...messages.slice(-(MAX_MESSAGES - 1)), message];
+				if (!stickToBottom) missedCount += 1;
 			},
 			onStatus: (status) => {
 				statuses = { ...statuses, [status.sourceId]: status };
@@ -52,8 +86,9 @@
 		</p>
 	{/if}
 
-	<ul class="feed">
-		{#each messages as message (message.id)}
+	<div class="feed-wrap">
+		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
+			{#each messages as message (message.id)}
 			<li>
 				<span class="author" style:color={message.author.color}
 					>{message.author.name}{#if message.author.login}
@@ -67,8 +102,14 @@
 						/>{/if}
 				{/each}
 			</li>
-		{/each}
-	</ul>
+			{/each}
+		</ul>
+		{#if !stickToBottom}
+			<button class="resume-pill" onclick={resumeScroll}>
+				paused{missedCount > 0 ? ` — ${missedCount} new message${missedCount === 1 ? '' : 's'}` : ''} ↓
+			</button>
+		{/if}
+	</div>
 </main>
 
 <style>
@@ -137,12 +178,33 @@
 		color: var(--text-muted);
 	}
 
+	.feed-wrap {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
 	.feed {
 		list-style: none;
 		margin: 0;
 		padding: 0.5rem 0;
 		overflow-y: auto;
 		flex: 1;
+	}
+
+	.resume-pill {
+		position: absolute;
+		bottom: 0.75rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--surface);
+		border: 1px solid var(--accent);
+		border-radius: 999px;
+		padding: 0.3rem 0.9rem;
+		font-size: 0.85rem;
+		white-space: nowrap;
 	}
 
 	.feed li {
