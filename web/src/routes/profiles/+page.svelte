@@ -113,6 +113,55 @@
 		}
 	}
 
+	/** Profile id whose OBS URL panel is open. */
+	let obsOpenId = $state<string | undefined>();
+	/** URL just copied, for transient button feedback. */
+	let copiedUrl = $state<string | undefined>();
+
+	/**
+	 * OBS URLs for a profile, built from the browser's own origin so they stay
+	 * correct however the app is reached (localhost, LAN IP, or a proxied
+	 * hostname). Overlay adds ?overlay=1 — the feed renders chrome-less and
+	 * transparent for use as an OBS browser source (EDD §3.5).
+	 */
+	function obsUrls(profile: Profile): { title: string; hint: string; url: string }[] {
+		const base = `${location.origin}/?profile=${encodeURIComponent(profile.id)}`;
+		return [
+			{
+				title: 'Dock',
+				hint: 'OBS → Docks → Custom Browser Docks…',
+				url: base
+			},
+			{
+				title: 'Overlay',
+				hint: 'OBS → Sources → Browser (transparent, chrome-less)',
+				url: `${base}&overlay=1`
+			}
+		];
+	}
+
+	async function copyUrl(url: string) {
+		try {
+			if (!navigator.clipboard?.writeText) throw new Error('clipboard API unavailable');
+			await navigator.clipboard.writeText(url);
+		} catch {
+			// navigator.clipboard only exists in secure contexts (https or
+			// localhost) and can be permission-denied even there. Reaching the
+			// app over plain http on a LAN IP — a normal self-hosted setup —
+			// lands here; the deprecated execCommand path still works.
+			const textarea = document.createElement('textarea');
+			textarea.value = url;
+			document.body.appendChild(textarea);
+			textarea.select();
+			document.execCommand('copy');
+			textarea.remove();
+		}
+		copiedUrl = url;
+		setTimeout(() => {
+			if (copiedUrl === url) copiedUrl = undefined;
+		}, 1500);
+	}
+
 	async function remove(profile: Profile) {
 		if (!confirm(`Delete profile "${profile.name}"?`)) return;
 		error = undefined;
@@ -149,9 +198,28 @@
 						{profile.sources.length} source{profile.sources.length === 1 ? '' : 's'}
 					</span>
 					<a class="watch" href="/?profile={profile.id}">watch</a>
+					<button
+						onclick={() => (obsOpenId = obsOpenId === profile.id ? undefined : profile.id)}
+					>
+						obs urls
+					</button>
 					<button onclick={() => edit(profile)}>edit</button>
 					<button class="danger" onclick={() => remove(profile)}>delete</button>
 				</div>
+				{#if obsOpenId === profile.id}
+					<div class="obs-panel">
+						{#each obsUrls(profile) as entry (entry.title)}
+							<div class="obs-row">
+								<span class="obs-title">{entry.title}</span>
+								<code class="obs-url">{entry.url}</code>
+								<button onclick={() => copyUrl(entry.url)}>
+									{copiedUrl === entry.url ? 'copied ✓' : 'copy'}
+								</button>
+							</div>
+							<p class="obs-hint">{entry.hint}</p>
+						{/each}
+					</div>
+				{/if}
 			</li>
 		{:else}
 			<li class="empty">No profiles yet — create one to group chat sources.</li>
@@ -292,6 +360,44 @@
 	}
 
 	.empty {
+		color: var(--text-muted);
+	}
+
+	.obs-panel {
+		margin-top: 0.5rem;
+		padding-top: 0.5rem;
+		border-top: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.obs-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.obs-title {
+		font-weight: 600;
+		min-width: 4.5rem;
+	}
+
+	.obs-url {
+		flex: 1;
+		min-width: 0;
+		overflow-x: auto;
+		white-space: nowrap;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.25rem 0.5rem;
+		font-size: 0.85rem;
+	}
+
+	.obs-hint {
+		margin: 0 0 0.4rem;
+		font-size: 0.8rem;
 		color: var(--text-muted);
 	}
 
