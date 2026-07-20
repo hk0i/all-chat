@@ -34,13 +34,15 @@
 	let saving = $state(false);
 
 	/**
-	 * Not `crypto.randomUUID()` on purpose — that API only exists in secure
-	 * contexts (HTTPS or `localhost`), so it's silently undefined on a plain
-	 * `http://` LAN hostname and throws on click. This is just a client-only
-	 * Svelte #each key, not security-sensitive, so a counter is fine.
+	 * `crypto.randomUUID()` only exists in secure contexts (HTTPS or
+	 * `localhost`) — plain `http://` on a LAN hostname (e.g. `http://all-chat.lan`)
+	 * doesn't qualify, so it's silently undefined there and throws on click.
+	 * This is just a client-only Svelte #each key, not security-sensitive,
+	 * so fall back to a counter rather than requiring HTTPS for this.
 	 */
 	let keySeq = 0;
-	const newKey = () => `k${++keySeq}`;
+	const newKey = (): string =>
+		typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `k${++keySeq}`;
 
 	const CHANNEL_PLACEHOLDER: Record<Platform, string> = {
 		twitch: 'channel name',
