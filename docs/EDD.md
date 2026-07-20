@@ -360,6 +360,7 @@ v1 ships the hooks so this bolts on without restructuring:
 | Twitch anonymous IRC restricted | Low | Would break the entire ecosystem of chat tools; unlikely without notice |
 | High-throughput channels (10k+ msg/min) jank the UI | Medium | [rAF](#def-raf) (requestAnimationFrame) batching, ring buffer, virtualization if needed |
 | OBS embedded browser (CEF) quirks in dock/overlay | Low–Med | CEF is Chromium; avoid bleeding-edge CSS; test dock + source in OBS as a release gate |
+| Programmatic scroll-jump race: an instant scroll (Home key, scrollbar drag, `scrollTo()`) can be undone by the auto-scroll effect if a message lands in the same frame, before the native `scroll` event flips `stickToBottom` off — gradual wheel scrolling isn't affected | Low | rAF batching (landed) narrows the window; deferred fix would gate the scroll effect on a `wheel`/`touchmove`/`keydown` listener setting `stickToBottom` false optimistically, ahead of the `scroll` event |
 
 ## 8. Roadmap
 

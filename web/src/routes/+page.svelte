@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { page } from '$app/state';
 	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
@@ -43,6 +44,23 @@
 	let theme = $state<Theme>('dark');
 
 	/**
+	 * Browser-source overlay: transparent background, no header/chrome,
+	 * larger stroked text for on-stream legibility (EDD §3). `?overlay=1`.
+	 */
+	let overlayMode = $state(false);
+
+	/**
+	 * `&fade=N` — seconds a message stays before it's evicted from the feed,
+	 * so an overlay left running for hours doesn't pile up forever on
+	 * stream. Unset outside overlay use; messages live until MAX_MESSAGES
+	 * pushes them out instead.
+	 */
+	let fadeSeconds = $state<number | undefined>();
+	/** message id → receipt time (ms); drives the fade-eviction sweep. */
+	const receivedAt = new Map<string, number>();
+	let fadeSweepHandle: ReturnType<typeof setInterval> | undefined;
+
+	/**
 	 * Platforms with more than one live source in the current view — e.g. two
 	 * Twitch channels in one profile. The platform icon alone can't tell them
 	 * apart, so those messages also get a channel tag (EDD §3).
@@ -80,8 +98,21 @@
 		if (messageBuffer.length === 0) return;
 		const incoming = messageBuffer;
 		messageBuffer = [];
+		const now = Date.now();
+		for (const message of incoming) receivedAt.set(message.id, now);
 		messages = [...messages, ...incoming].slice(-MAX_MESSAGES);
 		if (!stickToBottom) missedCount += incoming.length;
+	}
+
+	/** Evicts messages older than `fadeSeconds`; the `out:fade` transition animates their removal. */
+	function sweepExpired() {
+		if (fadeSeconds === undefined) return;
+		const cutoff = Date.now() - fadeSeconds * 1000;
+		const next = messages.filter((message) => (receivedAt.get(message.id) ?? 0) > cutoff);
+		if (next.length === messages.length) return;
+		messages = next;
+		const keep = new Set(next.map((message) => message.id));
+		for (const id of receivedAt.keys()) if (!keep.has(id)) receivedAt.delete(id);
 	}
 
 	function onFeedScroll() {
@@ -113,30 +144,42 @@
 	onMount(() => {
 		theme = currentTheme();
 		const params = page.url.searchParams;
+		overlayMode = params.get('overlay') === '1';
+		document.body.classList.toggle('overlay', overlayMode);
 		showIcons = params.get('icons') !== '0';
 		showAvatars = params.has('avatars')
 			? params.get('avatars') !== '0'
 			: params.get('overlay') !== '1';
-		hasParams = params.has('profile') || params.has('source');
-		if (!hasParams) return;
 
-		const close = openChatStream(params.toString(), {
-			onHello: () => (connected = true),
-			onMessage: (message) => {
-				messageBuffer.push(message);
-				scheduleFlush();
-			},
-			onStatus: (status) => {
-				statuses = { ...statuses, [status.sourceId]: status };
-			},
-			onError: (message) => {
-				connected = false;
-				streamError = message;
-			}
-		});
+		const fadeParam = Number(params.get('fade'));
+		if (params.has('fade') && Number.isFinite(fadeParam) && fadeParam > 0) {
+			fadeSeconds = fadeParam;
+			fadeSweepHandle = setInterval(sweepExpired, 1000);
+		}
+
+		hasParams = params.has('profile') || params.has('source');
+		let closeStream: (() => void) | undefined;
+		if (hasParams) {
+			closeStream = openChatStream(params.toString(), {
+				onHello: () => (connected = true),
+				onMessage: (message) => {
+					messageBuffer.push(message);
+					scheduleFlush();
+				},
+				onStatus: (status) => {
+					statuses = { ...statuses, [status.sourceId]: status };
+				},
+				onError: (message) => {
+					connected = false;
+					streamError = message;
+				}
+			});
+		}
+
 		return () => {
-			close();
+			closeStream?.();
 			if (flushHandle !== undefined) cancelAnimationFrame(flushHandle);
+			if (fadeSweepHandle !== undefined) clearInterval(fadeSweepHandle);
 		};
 	});
 </script>
@@ -145,19 +188,21 @@
 	<title>All Chat</title>
 </svelte:head>
 
-<main>
-	<header>
-		<h1>All Chat</h1>
-		<div class="controls">
-			{#each Object.values(statuses) as status (status.sourceId)}
-				<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
-			{/each}
-			<a class="nav" href="/profiles">profiles</a>
-			<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
-			<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
-			<button onclick={() => (theme = toggleTheme())}>theme</button>
-		</div>
-	</header>
+<main class:overlay={overlayMode}>
+	{#if !overlayMode}
+		<header>
+			<h1>All Chat</h1>
+			<div class="controls">
+				{#each Object.values(statuses) as status (status.sourceId)}
+					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
+				{/each}
+				<a class="nav" href="/profiles">profiles</a>
+				<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
+				<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
+				<button onclick={() => (theme = toggleTheme())}>theme</button>
+			</div>
+		</header>
+	{/if}
 
 	{#if streamError}
 		<p class="error-banner" role="alert">Couldn't connect: {streamError}</p>
@@ -171,7 +216,10 @@
 	<div class="feed-wrap">
 		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
 			{#each messages as message (message.id)}
-			<li class={showIcons ? `striped platform-${message.platform}` : undefined}>
+			<li
+				class={showIcons ? `striped platform-${message.platform}` : undefined}
+				out:fade={fadeSeconds !== undefined ? { duration: 400 } : { duration: 0 }}
+			>
 				{#if showIcons}<PlatformIcon
 						platform={message.platform}
 					/>{#if duplicatePlatforms.has(message.platform)}<span class="source-tag"
@@ -363,5 +411,29 @@
 	.emote {
 		height: 1.4em;
 		vertical-align: middle;
+	}
+
+	/*
+	 * Overlay mode renders over arbitrary stream video, so text needs a
+	 * synthetic stroke (layered shadows in every direction) rather than
+	 * relying on background contrast — colors that read fine on the app's
+	 * own bg/surface tokens can vanish against gameplay footage.
+	 */
+	main.overlay {
+		max-width: none;
+		padding: 0.5rem 1rem;
+	}
+
+	main.overlay .feed {
+		font-size: 1.3rem;
+	}
+
+	main.overlay .feed li {
+		text-shadow:
+			-1px -1px 0 #000,
+			1px -1px 0 #000,
+			-1px 1px 0 #000,
+			1px 1px 0 #000,
+			0 2px 4px rgba(0, 0, 0, 0.6);
 	}
 </style>
