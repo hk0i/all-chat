@@ -75,6 +75,7 @@
 			{#each Object.values(statuses) as status (status.sourceId)}
 				<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
 			{/each}
+			<a class="nav" href="/profiles">profiles</a>
 			<button onclick={() => toggleTheme()}>theme</button>
 		</div>
 	</header>
@@ -172,6 +173,16 @@
 
 	button:hover {
 		border-color: var(--accent);
+	}
+
+	.nav {
+		color: var(--text-muted);
+		text-decoration: none;
+		font-size: 0.9rem;
+	}
+
+	.nav:hover {
+		color: var(--accent);
 	}
 
 	.hint {
