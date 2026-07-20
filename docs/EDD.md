@@ -206,6 +206,16 @@ URL params reference a profile plus view options (`?profile=<idOrName>&overlay=1
 - **Streaming:** unified SSE endpoint (native `ReadableStream` response in a server route). Server-side WebSocket clients (`ws` package or Node's built-in `WebSocket`) for Twitch IRC and Kick Pusher.
 - **Styling:** hand-rolled [CSS](#def-css), dark theme default (streamers run dark UIs); transparent theme for overlay mode. No CSS framework.
 - **Testing:** Vitest for message parsers/normalizers, fixture-driven with recorded real payloads per platform. Parsers are the fragile surface; they get the coverage.
+
+### 5.1 Backend language decision record (TypeScript/Node vs Go vs Swift; JSON vs protobuf)
+
+Evaluated for minimal system requirements, considered and settled:
+
+- **Go** would cut idle RAM (~20–30 MB vs Node's ~80–120 MB) and image size (~15 MB distroless vs ~130 MB node-slim), but forces a two-codebase split: the SvelteKit frontend needs the Node toolchain regardless, and the server/frontend would no longer share `types.ts` at compile time — the single-contract property is worth more than the RAM. Context matters too: the host already runs OBS and Restreamer/ffmpeg; a ~100 MB difference is noise on that box. The chat-tool ecosystem (IRC parsing, InnerTube clients, fixtures) and its contributor pool are also overwhelmingly JavaScript.
+- **Swift (Vapor)** — thin server-side ecosystem, no image-size win over Go, and the apparent type-sharing synergy with the SwiftUI app is illusory: mobile consumes the wire format, not server internals.
+- **Protobuf** — rejected. [SSE](#def-sse) is a text protocol and the browser `EventSource` consumes JSON natively; protobuf would mean base64-wrapped binary over a text stream. Message volume makes serialization overhead immaterial, and JSON keeps the API curl-debuggable and trivially consumable by homebrew bot plugins (§9.2).
+- **Mobile type sharing (SwiftUI first, then Android):** contract-first via JSON Schema. `types.ts` remains the source of truth; JSON Schema is generated from it (e.g. `ts-json-schema-generator`), and Swift `Codable` structs are generated from the schema (quicktype) at mobile kickoff — same path later for Kotlin. Wire-format versioning already exists (`apiVersion` in the `hello` event, §4.1).
+- **Footprint work that is free and kept:** multi-stage Docker build, distroless or alpine Node base image, production-pruned dependencies, single process. Targets: image < 150 MB, idle RSS < 150 MB. Escape hatch if performance ever actually hurts: swap the runtime to Bun (drop-in experiment) before considering any rewrite.
 - **Repo layout:**
   ```
   all-chat/
