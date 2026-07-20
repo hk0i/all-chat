@@ -56,6 +56,30 @@
 	let stickToBottom = $state(true);
 	let missedCount = $state(0);
 
+	/**
+	 * Incoming SSE messages land here first, not directly in `messages` —
+	 * a busy channel (10k+ msg/min, EDD §7) firing one Svelte state update
+	 * per message would re-render the list that often. Buffered and flushed
+	 * once per animation frame instead, so render rate tracks the display's
+	 * refresh rate, not the chat's.
+	 */
+	let messageBuffer: ChatMessage[] = [];
+	let flushHandle: number | undefined;
+
+	function scheduleFlush() {
+		if (flushHandle !== undefined) return;
+		flushHandle = requestAnimationFrame(flushMessages);
+	}
+
+	function flushMessages() {
+		flushHandle = undefined;
+		if (messageBuffer.length === 0) return;
+		const incoming = messageBuffer;
+		messageBuffer = [];
+		messages = [...messages, ...incoming].slice(-MAX_MESSAGES);
+		if (!stickToBottom) missedCount += incoming.length;
+	}
+
 	function onFeedScroll() {
 		if (!feedElement) return;
 		const distanceFromBottom =
@@ -94,15 +118,18 @@
 		const close = openChatStream(params.toString(), {
 			onHello: () => (connected = true),
 			onMessage: (message) => {
-				messages = [...messages.slice(-(MAX_MESSAGES - 1)), message];
-				if (!stickToBottom) missedCount += 1;
+				messageBuffer.push(message);
+				scheduleFlush();
 			},
 			onStatus: (status) => {
 				statuses = { ...statuses, [status.sourceId]: status };
 			},
 			onError: () => (connected = false)
 		});
-		return close;
+		return () => {
+			close();
+			if (flushHandle !== undefined) cancelAnimationFrame(flushHandle);
+		};
 	});
 </script>
 
