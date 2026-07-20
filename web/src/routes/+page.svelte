@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
+	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
 	import { openChatStream } from '$lib/stream';
 	import { toggleTheme } from '$lib/theme';
@@ -21,6 +22,12 @@
 	 * options).
 	 */
 	let showIcons = $state(true);
+
+	/**
+	 * Avatars default on in the dock/browser, off in overlay mode (visual
+	 * noise on stream) — `&avatars=` always wins when present (EDD §3).
+	 */
+	let showAvatars = $state(true);
 
 	let feedElement = $state<HTMLUListElement | undefined>();
 	/** False once the user scrolls up; new messages then pause instead of yanking the view. */
@@ -56,6 +63,9 @@
 	onMount(() => {
 		const params = page.url.searchParams;
 		showIcons = params.get('icons') !== '0';
+		showAvatars = params.has('avatars')
+			? params.get('avatars') !== '0'
+			: params.get('overlay') !== '1';
 		if (!params.has('profile') && !params.has('source')) return;
 
 		const close = openChatStream(params.toString(), {
@@ -86,6 +96,7 @@
 			{/each}
 			<a class="nav" href="/profiles">profiles</a>
 			<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
+			<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
 			<button onclick={() => toggleTheme()}>theme</button>
 		</div>
 	</header>
@@ -101,7 +112,9 @@
 		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
 			{#each messages as message (message.id)}
 			<li class={showIcons ? `striped platform-${message.platform}` : undefined}>
-				{#if showIcons}<PlatformIcon platform={message.platform} />{/if}<span
+				{#if showIcons}<PlatformIcon platform={message.platform} />{/if}{#if showAvatars}<AvatarDisc
+						author={message.author}
+					/>{/if}<span
 					class="author"
 					style:color={message.author.color}
 					>{message.author.name}{#if message.author.login}
