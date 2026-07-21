@@ -59,3 +59,13 @@ export function oauthConfigFor(platform: OAuthPlatform, origin: string): OAuthPr
 			return youtubeOAuthConfig(origin);
 	}
 }
+
+/** Whether the operator has set this provider's client id/secret env vars — checked without needing an origin/redirect URI. */
+export function isProviderConfigured(platform: OAuthPlatform): boolean {
+	switch (platform) {
+		case 'twitch':
+			return !!(process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET);
+		case 'youtube':
+			return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+	}
+}

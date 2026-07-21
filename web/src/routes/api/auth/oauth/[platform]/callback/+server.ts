@@ -27,7 +27,15 @@ export const GET: RequestHandler = async ({ params, cookies, url }) => {
 	const config = oauthConfigFor(params.platform, url.origin);
 	if (!config) throw error(400, `${params.platform} OAuth is not configured on this deployment`);
 
-	const tokens = await exchangeCodeForTokens(config, code);
+	let tokens;
+	try {
+		tokens = await exchangeCodeForTokens(config, code);
+	} catch (cause) {
+		// A bad client secret, an already-used/expired code, or the provider being
+		// down all land here — a real, expected failure mode for an admin
+		// mis-typing credentials, not an unexpected server error.
+		throw error(502, `${params.platform} rejected the token exchange: ${(cause as Error).message}`);
+	}
 	await savePlatformTokens(params.platform, tokens);
 
 	redirect(302, '/admin');

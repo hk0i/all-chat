@@ -133,6 +133,8 @@ export interface UrlTokenInfo {
  */
 export interface PlatformConnectionInfo {
 	platform: Platform;
+	/** Whether the operator has set the provider's client id/secret env vars at all. */
+	configured: boolean;
 	connected: boolean;
 	connectedAt: number | null;
 }

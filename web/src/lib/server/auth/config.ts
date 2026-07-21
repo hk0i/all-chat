@@ -208,8 +208,15 @@ export async function clearPlatformTokens(platform: Platform): Promise<boolean> 
 	return true;
 }
 
-/** Connected/not status for the given platforms — never the tokens themselves. */
-export async function listPlatformConnections(platforms: Platform[]): Promise<PlatformConnectionInfo[]> {
+/**
+ * Connected/not status for the given platforms — never the tokens
+ * themselves. Omits `configured` (whether the operator set the provider's
+ * env vars at all): that's `providers.ts`'s concern, not this storage
+ * module's, so callers merge it in.
+ */
+export async function listPlatformConnections(
+	platforms: Platform[]
+): Promise<Omit<PlatformConnectionInfo, 'configured'>[]> {
 	const config = await load();
 	return platforms.map((platform) => {
 		const record = config.platformTokens[platform];

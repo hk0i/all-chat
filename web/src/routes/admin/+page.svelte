@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BearerTokenInfo, Profile, UrlTokenInfo } from '@all-chat/contract';
+	import type { BearerTokenInfo, PlatformConnectionInfo, Profile, UrlTokenInfo } from '@all-chat/contract';
 	import { copyToClipboard } from '$lib/clipboard';
 	import { toggleTheme } from '$lib/theme';
 
@@ -13,6 +13,8 @@
 	let profiles = $state<Profile[]>(data.profiles);
 	// svelte-ignore state_referenced_locally
 	let authEnabled = $state(data.authEnabled);
+	// svelte-ignore state_referenced_locally
+	let platformConnections = $state<PlatformConnectionInfo[]>(data.platformConnections);
 
 	let error = $state<string | undefined>();
 
@@ -116,6 +118,23 @@
 		}
 		authEnabled = false;
 	}
+
+	const PLATFORM_LABELS: Record<string, string> = { twitch: 'Twitch', youtube: 'YouTube' };
+
+	async function disconnectPlatform(platform: string) {
+		error = undefined;
+		if (!confirm(`Disconnect ${PLATFORM_LABELS[platform] ?? platform}? You cannot send chat messages to it until you reconnect.`)) {
+			return;
+		}
+		const response = await fetch(`/api/auth/oauth/${platform}`, { method: 'DELETE' });
+		if (!response.ok) {
+			error = ((await response.json()) as { message?: string }).message ?? response.statusText;
+			return;
+		}
+		platformConnections = platformConnections.map((c) =>
+			c.platform === platform ? { ...c, connected: false, connectedAt: null } : c
+		);
+	}
 </script>
 
 <svelte:head>
@@ -159,6 +178,30 @@
 				the <a href="/login">login page</a> to enable it.
 			</p>
 		{/if}
+	</section>
+
+	<section>
+		<h2>Platform connections</h2>
+		<p class="hint">
+			Reading already works anonymously for these — connecting unlocks <em>sending</em> messages through
+			them (EDD-V2 §5). Kick and Facebook aren't wired up yet.
+		</p>
+
+		<ul class="tokens">
+			{#each platformConnections as c (c.platform)}
+				<li>
+					<span class="name">{PLATFORM_LABELS[c.platform] ?? c.platform}</span>
+					{#if !c.configured}
+						<span class="meta">not configured on this deployment — set its client id/secret env vars</span>
+					{:else if c.connected}
+						<span class="meta">connected since {formatDate(c.connectedAt ?? 0)}</span>
+						<button onclick={() => disconnectPlatform(c.platform)}>disconnect</button>
+					{:else}
+						<a class="connect" href={`/api/auth/oauth/${c.platform}/start`}>connect</a>
+					{/if}
+				</li>
+			{/each}
+		</ul>
 	</section>
 
 	<section>
@@ -348,6 +391,20 @@
 		flex: 1;
 		margin: 0;
 		text-align: right;
+	}
+
+	.connect {
+		margin-left: auto;
+		background: var(--surface);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.25rem 0.6rem;
+		text-decoration: none;
+	}
+
+	.connect:hover {
+		border-color: var(--accent);
 	}
 
 	form {
