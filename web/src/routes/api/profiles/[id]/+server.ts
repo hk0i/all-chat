@@ -1,8 +1,14 @@
 import { error, json } from '@sveltejs/kit';
 import { getOverlayProfileId, setOverlayProfileId } from '$lib/server/overlayProfile';
-import { deleteProfile, updateProfile } from '$lib/server/profiles';
+import { deleteProfile, findProfile, updateProfile } from '$lib/server/profiles';
 import { normalizeSources } from '$lib/server/validate';
 import type { RequestHandler } from './$types';
+
+export const GET: RequestHandler = async ({ params }) => {
+	const profile = await findProfile(params.id);
+	if (!profile) throw error(404, `profile "${params.id}" not found`);
+	return json(profile);
+};
 
 export const PUT: RequestHandler = async ({ params, request }) => {
 	const body = (await request.json().catch(() => null)) as {

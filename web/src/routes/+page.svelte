@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/state';
-	import type { ChatMessage, StatusEvent } from '@all-chat/contract';
+	import type { ChatMessage, Profile, StatusEvent } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
 	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
@@ -30,6 +30,8 @@
 	let hasParams = $state(false);
 	/** Set when the stream connection fails permanently (see stream.ts onError). */
 	let streamError = $state<string | undefined>();
+	/** Display name of the connected profile (?profile=), for the header title — undefined for ad-hoc ?source= or before it resolves. */
+	let profileName = $state<string | undefined>();
 	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
 	let overlayNoProfile = $state(false);
 	/** Polling interval — how often a profile-agnostic overlay re-checks which profile it should show. */
@@ -197,6 +199,15 @@
 
 		if (explicitTarget) {
 			connectStream(params);
+			const profileParam = params.get('profile');
+			if (profileParam) {
+				fetch(`/api/profiles/${encodeURIComponent(profileParam)}`)
+					.then((response) => (response.ok ? (response.json() as Promise<Profile>) : null))
+					.then((profile) => {
+						if (profile) profileName = profile.name;
+					})
+					.catch(() => {});
+			}
 		} else if (overlayMode) {
 			// Profile-agnostic overlay: one fixed OBS URL, switchable from the
 			// Profiles page without touching the source in OBS (EDD §3).
@@ -243,13 +254,13 @@
 </script>
 
 <svelte:head>
-	<title>All Chat</title>
+	<title>{profileName ? `All Chat — ${profileName}` : 'All Chat'}</title>
 </svelte:head>
 
 <main class:overlay={overlayMode}>
 	{#if !overlayMode}
 		<header>
-			<h1>All Chat</h1>
+			<h1>All Chat {#if profileName} / <span class="profile-name">{profileName}</span>{/if}</h1>
 			<div class="controls">
 				{#each Object.values(statuses) as status (status.sourceId)}
 					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
@@ -508,5 +519,9 @@
 			-1px 1px 0 #000,
 			1px 1px 0 #000,
 			0 2px 4px rgba(0, 0, 0, 0.6);
+	}
+
+	.profile-name {
+		color: var(--text-muted);
 	}
 </style>
