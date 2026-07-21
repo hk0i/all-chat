@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import type { BearerTokenInfo, Platform, PlatformConnectionInfo, UrlTokenInfo } from '@all-chat/contract';
+import type { BearerTokenInfo, ConnectablePlatform, PlatformConnectionInfo, UrlTokenInfo } from '@all-chat/contract';
 import { hashPassword, verifyPassword } from './passwordHash';
 import { generateToken, hashToken, verifyTokenHash } from './tokens';
 
@@ -36,7 +36,7 @@ export interface PlatformConnectionRecord extends PlatformConnectionInfo {
 	refreshToken?: string;
 	/** Epoch ms; undefined if the provider didn't return an expiry. */
 	expiresAt?: number;
-	/** Facebook only — a Page access token is scoped to one Page, needed to read/send on its Live Video comments (EDD-V2 §4). */
+	/** Facebook only — which Page this (page-scoped) access token belongs to; needed to know which Page's Live Video comments to poll/post to (EDD-V2 §4). */
 	facebookPageId?: string;
 }
 
@@ -204,7 +204,7 @@ export async function createPlatformConnection(
 }
 
 /** Metadata only — never the tokens, which stay server-side. */
-export async function listPlatformConnections(platform?: Platform): Promise<PlatformConnectionInfo[]> {
+export async function listPlatformConnections(platform?: ConnectablePlatform): Promise<PlatformConnectionInfo[]> {
 	const { platformConnections } = await load();
 	return platformConnections.filter((c) => !platform || c.platform === platform).map(toConnectionInfo);
 }

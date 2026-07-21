@@ -128,6 +128,30 @@ describe('platform connections', () => {
 		expect(await config.listPlatformConnections('youtube')).toHaveLength(1);
 	});
 
+	it('accepts facebook as a connectable platform, each Page its own connection', async () => {
+		const a = await config.createPlatformConnection({
+			platform: 'facebook',
+			accountLabel: 'My Streaming Page',
+			accessToken: 'page-token-1',
+			facebookPageId: '111'
+		});
+		const b = await config.createPlatformConnection({
+			platform: 'facebook',
+			accountLabel: 'Side Project Page',
+			accessToken: 'page-token-2',
+			facebookPageId: '222'
+		});
+
+		const listed = await config.listPlatformConnections('facebook');
+		expect(listed.map((c) => c.accountLabel).sort()).toEqual(['My Streaming Page', 'Side Project Page']);
+
+		const full = await config.getPlatformConnection(a.id);
+		expect(full?.facebookPageId).toBe('111');
+
+		expect(await config.revokePlatformConnection(a.id)).toBe(true);
+		expect((await config.listPlatformConnections('facebook')).map((c) => c.id)).toEqual([b.id]);
+	});
+
 	it('updates tokens in place on refresh, leaving label/id/connectedAt untouched', async () => {
 		const created = await config.createPlatformConnection({
 			platform: 'twitch',

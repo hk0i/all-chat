@@ -119,7 +119,7 @@
 		authEnabled = false;
 	}
 
-	const PLATFORM_LABELS: Record<string, string> = { twitch: 'Twitch', youtube: 'YouTube' };
+	const PLATFORM_LABELS: Record<string, string> = { twitch: 'Twitch', youtube: 'YouTube', facebook: 'Facebook' };
 
 	async function disconnectConnection(platform: string, id: string, accountLabel: string) {
 		error = undefined;
@@ -187,9 +187,11 @@
 	<section>
 		<h2>Platform connections</h2>
 		<p class="hint">
-			Reading already works anonymously for these — connecting unlocks <em>sending</em> messages through
-			them (EDD-V2 §5). Connect as many accounts per platform as you like (a co-streamer's, an alt) — each
-			is independent. Kick and Facebook aren't wired up yet.
+			For Twitch/YouTube, reading already works anonymously — connecting unlocks <em>sending</em> messages
+			through them (EDD-V2 §5). Facebook has no anonymous read path, so connecting it is required just to
+			read its chat (EDD-V2 §4) — connecting adds every Page you manage at once, not one at a time. Connect
+			as many accounts per platform as you like (a co-streamer's, an alt) — each is independent. Kick isn't
+			wired up yet.
 		</p>
 
 		{#each platformProviders as p (p.platform)}

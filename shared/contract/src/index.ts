@@ -136,9 +136,19 @@ export interface UrlTokenInfo {
  * (e.g. a co-streamer's, or an alt) is a normal, unremarkable action, not a
  * replacement for the first.
  */
+/**
+ * Platforms that can have an OAuth connection (EDD-V2 §3) — a superset of
+ * `Platform`, since Facebook needs a connection just to *read* (EDD-V2 §4:
+ * no anonymous path exists), not only to unlock sending like Twitch/YouTube.
+ * Kept separate from `Platform` (which governs `SourceConfig`/`ChatMessage`,
+ * i.e. actual ingestion) so this can grow ahead of ingestion support —
+ * Facebook connections exist before any `FacebookSource` `ChatSource` does.
+ */
+export type ConnectablePlatform = Platform | 'facebook';
+
 export interface PlatformConnectionInfo {
 	id: string;
-	platform: Platform;
+	platform: ConnectablePlatform;
 	/** The connected account's own display name/handle, fetched at connect time (Twitch login, YouTube channel title, Facebook Page name) — how multiple connections on the same platform are told apart in the UI. */
 	accountLabel: string;
 	connectedAt: number;
@@ -146,7 +156,7 @@ export interface PlatformConnectionInfo {
 
 /** Per-platform summary for the control panel: whether the operator has configured OAuth for it at all, plus every currently connected account. */
 export interface PlatformProviderStatus {
-	platform: Platform;
+	platform: ConnectablePlatform;
 	/** Whether the operator has set the provider's client id/secret env vars at all. */
 	configured: boolean;
 	connections: PlatformConnectionInfo[];

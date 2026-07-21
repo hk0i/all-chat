@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { PlatformProviderStatus } from '@all-chat/contract';
 import { listPlatformConnections } from '$lib/server/auth/config';
+import { isFacebookConfigured } from '$lib/server/auth/facebookOAuth';
 import { isProviderConfigured, type OAuthPlatform } from '$lib/server/auth/providers';
 import type { RequestHandler } from './$types';
 
@@ -14,5 +15,10 @@ export const GET: RequestHandler = async () => {
 			connections: await listPlatformConnections(platform)
 		}))
 	);
+	statuses.push({
+		platform: 'facebook',
+		configured: isFacebookConfigured(),
+		connections: await listPlatformConnections('facebook')
+	});
 	return json(statuses);
 };
