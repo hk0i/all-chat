@@ -11,6 +11,8 @@
 	let urlTokens = $state<UrlTokenInfo[]>(data.urlTokens);
 	// svelte-ignore state_referenced_locally
 	let profiles = $state<Profile[]>(data.profiles);
+	// svelte-ignore state_referenced_locally
+	let authEnabled = $state(data.authEnabled);
 
 	let error = $state<string | undefined>();
 
@@ -98,6 +100,22 @@
 		copied = true;
 		setTimeout(() => (copied = false), 1500);
 	}
+
+	/**
+	 * "Change password" is just this followed by `/login`'s first-run setup
+	 * form again — no separate change-password flow needed.
+	 */
+	async function disableAuth() {
+		error = undefined;
+		if (!confirm('Disable app auth? The deployment becomes open access until a new password is set.')) return;
+
+		const response = await fetch('/api/auth/password', { method: 'DELETE' });
+		if (!response.ok) {
+			error = ((await response.json()) as { message?: string }).message ?? response.statusText;
+			return;
+		}
+		authEnabled = false;
+	}
 </script>
 
 <svelte:head>
@@ -129,6 +147,19 @@
 			</div>
 		</section>
 	{/if}
+
+	<section>
+		<h2>Admin password</h2>
+		{#if authEnabled}
+			<p class="hint">App auth is on — a session, bearer token, or scoped URL token is required for everything except the paths listed in EDD §6.1.</p>
+			<button onclick={disableAuth}>disable auth</button>
+		{:else}
+			<p class="hint">
+				App auth is off — the deployment is open access (v1-compatible default). Set a password from
+				the <a href="/login">login page</a> to enable it.
+			</p>
+		{/if}
+	</section>
 
 	<section>
 		<h2>Bearer tokens</h2>
