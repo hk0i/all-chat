@@ -42,7 +42,14 @@ export function youtubeOAuthConfig(origin: string): OAuthProviderConfig | undefi
 	};
 }
 
+/** Shared between the start and callback routes — SvelteKit route modules may only export handlers, not arbitrary constants. */
+export const OAUTH_STATE_COOKIE = 'allchat_oauth_state';
+
 export type OAuthPlatform = 'twitch' | 'youtube';
+
+export function isOAuthPlatform(value: string): value is OAuthPlatform {
+	return value === 'twitch' || value === 'youtube';
+}
 
 export function oauthConfigFor(platform: OAuthPlatform, origin: string): OAuthProviderConfig | undefined {
 	switch (platform) {

@@ -65,10 +65,20 @@ async function load(): Promise<AuthConfig> {
 	}
 }
 
-/** Atomic write: temp file then rename (same pattern as profiles.ts). */
+/**
+ * Atomic write: temp file then rename (same pattern as profiles.ts) — but
+ * `hooks.server.ts` calls `isAuthEnabled()` (and so `load()`/`save()`) on
+ * every single request, unlike profiles.json which only loads once per page
+ * load. That makes the temp filename a real collision point: two concurrent
+ * requests hitting the ENOENT-create-default path at once would both write
+ * `config.json.tmp` and race each other's rename. A per-call unique temp
+ * name avoids the collision; the underlying "last save wins" race on
+ * concurrent read-modify-write is still accepted at this project's scale
+ * (EDD §3.4), same as profiles.ts.
+ */
 async function save(config: AuthConfig): Promise<void> {
 	await mkdir(DATA_DIR, { recursive: true });
-	const tmp = `${CONFIG_PATH}.tmp`;
+	const tmp = `${CONFIG_PATH}.tmp.${process.pid}.${randomBytes(4).toString('hex')}`;
 	await writeFile(tmp, JSON.stringify(config, null, '\t'), 'utf8');
 	await rename(tmp, CONFIG_PATH);
 }
