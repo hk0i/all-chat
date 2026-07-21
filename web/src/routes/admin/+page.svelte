@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BearerTokenInfo, PlatformConnectionInfo, Profile, UrlTokenInfo } from '@all-chat/contract';
+	import type { BearerTokenInfo, PlatformProviderStatus, Profile, UrlTokenInfo } from '@all-chat/contract';
 	import { copyToClipboard } from '$lib/clipboard';
 	import { toggleTheme } from '$lib/theme';
 
@@ -14,7 +14,7 @@
 	// svelte-ignore state_referenced_locally
 	let authEnabled = $state(data.authEnabled);
 	// svelte-ignore state_referenced_locally
-	let platformConnections = $state<PlatformConnectionInfo[]>(data.platformConnections);
+	let platformProviders = $state<PlatformProviderStatus[]>(data.platformProviders);
 
 	let error = $state<string | undefined>();
 
@@ -121,18 +121,22 @@
 
 	const PLATFORM_LABELS: Record<string, string> = { twitch: 'Twitch', youtube: 'YouTube' };
 
-	async function disconnectPlatform(platform: string) {
+	async function disconnectConnection(platform: string, id: string, accountLabel: string) {
 		error = undefined;
-		if (!confirm(`Disconnect ${PLATFORM_LABELS[platform] ?? platform}? You cannot send chat messages to it until you reconnect.`)) {
+		if (
+			!confirm(
+				`Disconnect ${PLATFORM_LABELS[platform] ?? platform} account "${accountLabel}"? You cannot send chat messages through it until you reconnect.`
+			)
+		) {
 			return;
 		}
-		const response = await fetch(`/api/auth/oauth/${platform}`, { method: 'DELETE' });
+		const response = await fetch(`/api/auth/oauth/connections/${id}`, { method: 'DELETE' });
 		if (!response.ok) {
 			error = ((await response.json()) as { message?: string }).message ?? response.statusText;
 			return;
 		}
-		platformConnections = platformConnections.map((c) =>
-			c.platform === platform ? { ...c, connected: false, connectedAt: null } : c
+		platformProviders = platformProviders.map((p) =>
+			p.platform === platform ? { ...p, connections: p.connections.filter((c) => c.id !== id) } : p
 		);
 	}
 </script>
@@ -184,24 +188,35 @@
 		<h2>Platform connections</h2>
 		<p class="hint">
 			Reading already works anonymously for these — connecting unlocks <em>sending</em> messages through
-			them (EDD-V2 §5). Kick and Facebook aren't wired up yet.
+			them (EDD-V2 §5). Connect as many accounts per platform as you like (a co-streamer's, an alt) — each
+			is independent. Kick and Facebook aren't wired up yet.
 		</p>
 
-		<ul class="tokens">
-			{#each platformConnections as c (c.platform)}
-				<li>
-					<span class="name">{PLATFORM_LABELS[c.platform] ?? c.platform}</span>
-					{#if !c.configured}
+		{#each platformProviders as p (p.platform)}
+			<div class="provider">
+				<div class="provider-row">
+					<span class="name">{PLATFORM_LABELS[p.platform] ?? p.platform}</span>
+					{#if !p.configured}
 						<span class="meta">not configured on this deployment — set its client id/secret env vars</span>
-					{:else if c.connected}
-						<span class="meta">connected since {formatDate(c.connectedAt ?? 0)}</span>
-						<button onclick={() => disconnectPlatform(c.platform)}>disconnect</button>
 					{:else}
-						<a class="connect" href={`/api/auth/oauth/${c.platform}/start`}>connect</a>
+						<a class="connect" href={`/api/auth/oauth/${p.platform}/start`}>
+							{p.connections.length === 0 ? 'connect' : 'connect another account'}
+						</a>
 					{/if}
-				</li>
-			{/each}
-		</ul>
+				</div>
+				{#if p.connections.length > 0}
+					<ul class="tokens">
+						{#each p.connections as c (c.id)}
+							<li>
+								<span class="name">{c.accountLabel}</span>
+								<span class="meta">connected since {formatDate(c.connectedAt)}</span>
+								<button onclick={() => disconnectConnection(p.platform, c.id, c.accountLabel)}>disconnect</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{/each}
 	</section>
 
 	<section>
@@ -354,6 +369,17 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		padding: 0.25rem 0.5rem;
+	}
+
+	.provider {
+		margin-bottom: 0.75rem;
+	}
+
+	.provider-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.tokens {

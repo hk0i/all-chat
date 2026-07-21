@@ -69,3 +69,35 @@ export function isProviderConfigured(platform: OAuthPlatform): boolean {
 			return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 	}
 }
+
+/**
+ * The connecting account's own display name/handle, fetched right after
+ * token exchange — needed to tell multiple connections on the same platform
+ * apart in the UI (EDD-V2 §3's contract doc comment explains why there can
+ * be more than one). Twitch and YouTube tokens carry no identity info on
+ * their own; this is one extra API call per connect, not per request.
+ */
+export async function fetchAccountLabel(
+	platform: OAuthPlatform,
+	accessToken: string,
+	fetchImpl: typeof fetch = fetch
+): Promise<string> {
+	switch (platform) {
+		case 'twitch': {
+			const response = await fetchImpl('https://api.twitch.tv/helix/users', {
+				headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': process.env.TWITCH_CLIENT_ID ?? '' }
+			});
+			if (!response.ok) throw new Error(`Twitch user lookup failed: ${response.status} ${await response.text()}`);
+			const body = (await response.json()) as { data: { display_name: string }[] };
+			return body.data[0]?.display_name ?? 'Twitch account';
+		}
+		case 'youtube': {
+			const response = await fetchImpl('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
+				headers: { Authorization: `Bearer ${accessToken}` }
+			});
+			if (!response.ok) throw new Error(`YouTube channel lookup failed: ${response.status} ${await response.text()}`);
+			const body = (await response.json()) as { items: { snippet: { title: string } }[] };
+			return body.items[0]?.snippet.title ?? 'YouTube channel';
+		}
+	}
+}

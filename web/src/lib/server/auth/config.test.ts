@@ -82,35 +82,71 @@ describe('URL tokens', () => {
 	});
 });
 
-describe('platform OAuth tokens', () => {
-	it('round-trips save/get/clear and preserves connectedAt across refreshes', async () => {
-		await config.savePlatformTokens('twitch', { accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: 123 });
-		const first = await config.getPlatformTokens('twitch');
-		expect(first?.accessToken).toBe('at-1');
-		const connectedAt = first?.connectedAt;
+describe('platform connections', () => {
+	it('creates, lists (sans tokens), and revokes a connection', async () => {
+		const created = await config.createPlatformConnection({
+			platform: 'twitch',
+			accountLabel: 'gmpekk',
+			accessToken: 'at-1',
+			refreshToken: 'rt-1',
+			expiresAt: 123
+		});
+		expect(created.accountLabel).toBe('gmpekk');
+		expect(created).not.toHaveProperty('accessToken');
 
-		// Simulate a token refresh: same platform, new access token.
-		await config.savePlatformTokens('twitch', { accessToken: 'at-2', expiresAt: 456 });
-		const refreshed = await config.getPlatformTokens('twitch');
+		const listed = await config.listPlatformConnections('twitch');
+		expect(listed).toEqual([created]);
+
+		const full = await config.getPlatformConnection(created.id);
+		expect(full?.accessToken).toBe('at-1');
+
+		expect(await config.revokePlatformConnection(created.id)).toBe(true);
+		expect(await config.getPlatformConnection(created.id)).toBeUndefined();
+		expect(await config.revokePlatformConnection(created.id)).toBe(false);
+	});
+
+	it('supports multiple independent connections on the same platform', async () => {
+		const a = await config.createPlatformConnection({ platform: 'twitch', accountLabel: 'gmpekk', accessToken: 'at-a' });
+		const b = await config.createPlatformConnection({
+			platform: 'twitch',
+			accountLabel: 'smallindie_alt',
+			accessToken: 'at-b'
+		});
+
+		const listed = await config.listPlatformConnections('twitch');
+		expect(listed.map((c) => c.id).sort()).toEqual([a.id, b.id].sort());
+
+		expect(await config.revokePlatformConnection(a.id)).toBe(true);
+		expect((await config.listPlatformConnections('twitch')).map((c) => c.id)).toEqual([b.id]);
+	});
+
+	it('lists across all platforms when none is given, filters when one is', async () => {
+		await config.createPlatformConnection({ platform: 'twitch', accountLabel: 'gmpekk', accessToken: 'at-1' });
+		await config.createPlatformConnection({ platform: 'youtube', accountLabel: 'My Channel', accessToken: 'at-2' });
+
+		expect(await config.listPlatformConnections()).toHaveLength(2);
+		expect(await config.listPlatformConnections('youtube')).toHaveLength(1);
+	});
+
+	it('updates tokens in place on refresh, leaving label/id/connectedAt untouched', async () => {
+		const created = await config.createPlatformConnection({
+			platform: 'twitch',
+			accountLabel: 'gmpekk',
+			accessToken: 'at-1',
+			expiresAt: 100
+		});
+
+		expect(await config.updatePlatformConnectionTokens(created.id, { accessToken: 'at-2', expiresAt: 200 })).toBe(true);
+		const refreshed = await config.getPlatformConnection(created.id);
 		expect(refreshed?.accessToken).toBe('at-2');
-		expect(refreshed?.connectedAt).toBe(connectedAt);
+		expect(refreshed?.expiresAt).toBe(200);
+		expect(refreshed?.accountLabel).toBe('gmpekk');
+		expect(refreshed?.connectedAt).toBe(created.connectedAt);
 
-		expect(await config.clearPlatformTokens('twitch')).toBe(true);
-		expect(await config.getPlatformTokens('twitch')).toBeUndefined();
-		expect(await config.clearPlatformTokens('twitch')).toBe(false);
+		expect(await config.updatePlatformConnectionTokens('missing-id', { accessToken: 'x' })).toBe(false);
 	});
 
-	it('reports connection status without exposing tokens', async () => {
-		await config.savePlatformTokens('youtube', { accessToken: 'at-1' });
-		const statuses = await config.listPlatformConnections(['twitch', 'youtube']);
-
-		expect(statuses).toEqual([
-			{ platform: 'twitch', connected: false, connectedAt: null },
-			{ platform: 'youtube', connected: true, connectedAt: expect.any(Number) }
-		]);
-	});
-
-	it('loads a pre-existing config.json that predates platformTokens', async () => {
+	it('loads a pre-existing config.json that predates platformConnections', async () => {
 		writeFileSync(
 			join(dir, 'config.json'),
 			JSON.stringify({ passwordHash: null, sessionSecret: 'abc', bearerTokens: [], urlTokens: [] })
@@ -118,35 +154,8 @@ describe('platform OAuth tokens', () => {
 		vi.resetModules();
 		config = await import('./config');
 
-		expect(await config.listPlatformConnections(['twitch'])).toEqual([
-			{ platform: 'twitch', connected: false, connectedAt: null }
-		]);
-		expect(await config.getFacebookPage()).toBeNull();
+		expect(await config.listPlatformConnections()).toEqual([]);
 		// The pre-existing sessionSecret survives the migration, not silently replaced.
 		expect(await config.getSessionSecret()).toBe('abc');
-	});
-});
-
-describe('Facebook page', () => {
-	it('is unset until connected', async () => {
-		expect(await config.getFacebookPage()).toBeNull();
-	});
-
-	it('round-trips save/get/clear', async () => {
-		await config.saveFacebookPage({ pageId: '111', pageName: 'My Streaming Page', pageAccessToken: 'page-token-1' });
-		const page = await config.getFacebookPage();
-		expect(page?.pageId).toBe('111');
-		expect(page?.pageName).toBe('My Streaming Page');
-		expect(page?.connectedAt).toEqual(expect.any(Number));
-
-		expect(await config.clearFacebookPage()).toBe(true);
-		expect(await config.getFacebookPage()).toBeNull();
-		expect(await config.clearFacebookPage()).toBe(false);
-	});
-
-	it('reconnecting to a different page replaces the stored one', async () => {
-		await config.saveFacebookPage({ pageId: '111', pageName: 'First Page', pageAccessToken: 'token-1' });
-		await config.saveFacebookPage({ pageId: '222', pageName: 'Second Page', pageAccessToken: 'token-2' });
-		expect((await config.getFacebookPage())?.pageId).toBe('222');
 	});
 });

@@ -127,14 +127,27 @@ export interface UrlTokenInfo {
 }
 
 /**
- * Whether a platform OAuth connection exists (EDD-V2 §3) — never the tokens
- * themselves, which stay server-side. Connecting a platform unlocks sending
- * messages through it (EDD-V2 §5); reading already works anonymously.
+ * One connected platform account (EDD-V2 §3) — never the tokens themselves,
+ * which stay server-side. Connecting an account unlocks sending messages
+ * through it (EDD-V2 §5); reading already works anonymously. Deliberately
+ * many-per-platform, not one: profiles already allow the same platform to
+ * repeat as a source (EDD §1/§2, reading multiple channels), and the same
+ * multiplicity applies to sending — connecting a second Twitch account
+ * (e.g. a co-streamer's, or an alt) is a normal, unremarkable action, not a
+ * replacement for the first.
  */
 export interface PlatformConnectionInfo {
+	id: string;
+	platform: Platform;
+	/** The connected account's own display name/handle, fetched at connect time (Twitch login, YouTube channel title, Facebook Page name) — how multiple connections on the same platform are told apart in the UI. */
+	accountLabel: string;
+	connectedAt: number;
+}
+
+/** Per-platform summary for the control panel: whether the operator has configured OAuth for it at all, plus every currently connected account. */
+export interface PlatformProviderStatus {
 	platform: Platform;
 	/** Whether the operator has set the provider's client id/secret env vars at all. */
 	configured: boolean;
-	connected: boolean;
-	connectedAt: number | null;
+	connections: PlatformConnectionInfo[];
 }

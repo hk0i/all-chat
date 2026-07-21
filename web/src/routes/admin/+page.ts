@@ -1,4 +1,4 @@
-import type { BearerTokenInfo, PlatformConnectionInfo, Profile, UrlTokenInfo } from '@all-chat/contract';
+import type { BearerTokenInfo, PlatformProviderStatus, Profile, UrlTokenInfo } from '@all-chat/contract';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {
@@ -15,6 +15,6 @@ export const load: PageLoad = async ({ fetch }) => {
 		urlTokens: (await urlResponse.json()) as UrlTokenInfo[],
 		profiles: (await profilesResponse.json()) as Profile[],
 		authEnabled: enabled,
-		platformConnections: (await oauthResponse.json()) as PlatformConnectionInfo[]
+		platformProviders: (await oauthResponse.json()) as PlatformProviderStatus[]
 	};
 };

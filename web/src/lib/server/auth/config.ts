@@ -24,27 +24,20 @@ export interface UrlTokenRecord extends UrlTokenInfo {
 	tokenHash: string;
 }
 
-/** Live OAuth credentials for one platform (EDD-V2 §3) — never leaves the server; only `PlatformConnectionInfo` (connected/not) crosses the API. */
-export interface PlatformTokenRecord {
+/**
+ * One connected platform account's live OAuth credentials (EDD-V2 §3) —
+ * never leaves the server; only `PlatformConnectionInfo` (id/label, no
+ * secrets) crosses the API. Many can exist per platform — see the doc
+ * comment on the contract's `PlatformConnectionInfo` for why that's not a
+ * singular slot.
+ */
+export interface PlatformConnectionRecord extends PlatformConnectionInfo {
 	accessToken: string;
 	refreshToken?: string;
 	/** Epoch ms; undefined if the provider didn't return an expiry. */
 	expiresAt?: number;
-	connectedAt: number;
-}
-
-/**
- * The one Facebook Page connected for this deployment (single-streamer
- * scope, matching every other credential in this file) — chosen by the
- * admin from whichever Pages `listManagedPages` (facebookOAuth.ts) returned
- * during connect. The Page access token, not a user token, is what actually
- * reads that Page's Live Video comments (EDD-V2 §4).
- */
-export interface FacebookPageRecord {
-	pageId: string;
-	pageName: string;
-	pageAccessToken: string;
-	connectedAt: number;
+	/** Facebook only — a Page access token is scoped to one Page, needed to read/send on its Live Video comments (EDD-V2 §4). */
+	facebookPageId?: string;
 }
 
 interface AuthConfig {
@@ -53,8 +46,7 @@ interface AuthConfig {
 	sessionSecret: string;
 	bearerTokens: BearerTokenRecord[];
 	urlTokens: UrlTokenRecord[];
-	platformTokens: Partial<Record<Platform, PlatformTokenRecord>>;
-	facebookPage: FacebookPageRecord | null;
+	platformConnections: PlatformConnectionRecord[];
 }
 
 const emptyConfig = (): AuthConfig => ({
@@ -62,8 +54,7 @@ const emptyConfig = (): AuthConfig => ({
 	sessionSecret: randomBytes(32).toString('hex'),
 	bearerTokens: [],
 	urlTokens: [],
-	platformTokens: {},
-	facebookPage: null
+	platformConnections: []
 });
 
 async function load(): Promise<AuthConfig> {
@@ -201,59 +192,50 @@ export async function verifyUrlToken(token: string): Promise<UrlTokenInfo | unde
 	return rest;
 }
 
-/** Stores a platform's OAuth tokens (fresh connect or post-refresh update). Preserves the original `connectedAt` across refreshes. */
-export async function savePlatformTokens(
-	platform: Platform,
+/** Adds a newly-connected platform account. Always appends — reconnecting the same account is a distinct additional entry, not an overwrite (dedup is the admin's call via the connections list, not silently automatic). */
+export async function createPlatformConnection(
+	data: Omit<PlatformConnectionRecord, 'id' | 'connectedAt'>
+): Promise<PlatformConnectionInfo> {
+	const config = await load();
+	const record: PlatformConnectionRecord = { ...data, id: randomBytes(8).toString('hex'), connectedAt: Date.now() };
+	config.platformConnections.push(record);
+	await save(config);
+	return toConnectionInfo(record);
+}
+
+/** Metadata only — never the tokens, which stay server-side. */
+export async function listPlatformConnections(platform?: Platform): Promise<PlatformConnectionInfo[]> {
+	const { platformConnections } = await load();
+	return platformConnections.filter((c) => !platform || c.platform === platform).map(toConnectionInfo);
+}
+
+/** The full record including live tokens — for internal use (sending messages, refreshing tokens), never returned from an API route. */
+export async function getPlatformConnection(id: string): Promise<PlatformConnectionRecord | undefined> {
+	return (await load()).platformConnections.find((c) => c.id === id);
+}
+
+export async function revokePlatformConnection(id: string): Promise<boolean> {
+	const config = await load();
+	const next = config.platformConnections.filter((c) => c.id !== id);
+	if (next.length === config.platformConnections.length) return false;
+	config.platformConnections = next;
+	await save(config);
+	return true;
+}
+
+/** Updates a connection's tokens in place after a refresh — label/id/connectedAt stay put. */
+export async function updatePlatformConnectionTokens(
+	id: string,
 	tokens: { accessToken: string; refreshToken?: string; expiresAt?: number }
-): Promise<void> {
+): Promise<boolean> {
 	const config = await load();
-	const existing = config.platformTokens[platform];
-	config.platformTokens[platform] = { ...tokens, connectedAt: existing?.connectedAt ?? Date.now() };
-	await save(config);
-}
-
-export async function getPlatformTokens(platform: Platform): Promise<PlatformTokenRecord | undefined> {
-	return (await load()).platformTokens[platform];
-}
-
-export async function clearPlatformTokens(platform: Platform): Promise<boolean> {
-	const config = await load();
-	if (!config.platformTokens[platform]) return false;
-	delete config.platformTokens[platform];
+	const record = config.platformConnections.find((c) => c.id === id);
+	if (!record) return false;
+	Object.assign(record, tokens);
 	await save(config);
 	return true;
 }
 
-/**
- * Connected/not status for the given platforms — never the tokens
- * themselves. Omits `configured` (whether the operator set the provider's
- * env vars at all): that's `providers.ts`'s concern, not this storage
- * module's, so callers merge it in.
- */
-export async function listPlatformConnections(
-	platforms: Platform[]
-): Promise<Omit<PlatformConnectionInfo, 'configured'>[]> {
-	const config = await load();
-	return platforms.map((platform) => {
-		const record = config.platformTokens[platform];
-		return { platform, connected: !!record, connectedAt: record?.connectedAt ?? null };
-	});
-}
-
-export async function saveFacebookPage(page: Omit<FacebookPageRecord, 'connectedAt'>): Promise<void> {
-	const config = await load();
-	config.facebookPage = { ...page, connectedAt: Date.now() };
-	await save(config);
-}
-
-export async function getFacebookPage(): Promise<FacebookPageRecord | null> {
-	return (await load()).facebookPage;
-}
-
-export async function clearFacebookPage(): Promise<boolean> {
-	const config = await load();
-	if (!config.facebookPage) return false;
-	config.facebookPage = null;
-	await save(config);
-	return true;
+function toConnectionInfo(record: PlatformConnectionRecord): PlatformConnectionInfo {
+	return { id: record.id, platform: record.platform, accountLabel: record.accountLabel, connectedAt: record.connectedAt };
 }
