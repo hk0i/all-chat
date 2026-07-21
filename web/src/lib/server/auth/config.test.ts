@@ -121,7 +121,32 @@ describe('platform OAuth tokens', () => {
 		expect(await config.listPlatformConnections(['twitch'])).toEqual([
 			{ platform: 'twitch', connected: false, connectedAt: null }
 		]);
+		expect(await config.getFacebookPage()).toBeNull();
 		// The pre-existing sessionSecret survives the migration, not silently replaced.
 		expect(await config.getSessionSecret()).toBe('abc');
+	});
+});
+
+describe('Facebook page', () => {
+	it('is unset until connected', async () => {
+		expect(await config.getFacebookPage()).toBeNull();
+	});
+
+	it('round-trips save/get/clear', async () => {
+		await config.saveFacebookPage({ pageId: '111', pageName: 'My Streaming Page', pageAccessToken: 'page-token-1' });
+		const page = await config.getFacebookPage();
+		expect(page?.pageId).toBe('111');
+		expect(page?.pageName).toBe('My Streaming Page');
+		expect(page?.connectedAt).toEqual(expect.any(Number));
+
+		expect(await config.clearFacebookPage()).toBe(true);
+		expect(await config.getFacebookPage()).toBeNull();
+		expect(await config.clearFacebookPage()).toBe(false);
+	});
+
+	it('reconnecting to a different page replaces the stored one', async () => {
+		await config.saveFacebookPage({ pageId: '111', pageName: 'First Page', pageAccessToken: 'token-1' });
+		await config.saveFacebookPage({ pageId: '222', pageName: 'Second Page', pageAccessToken: 'token-2' });
+		expect((await config.getFacebookPage())?.pageId).toBe('222');
 	});
 });

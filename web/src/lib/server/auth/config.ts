@@ -33,6 +33,20 @@ export interface PlatformTokenRecord {
 	connectedAt: number;
 }
 
+/**
+ * The one Facebook Page connected for this deployment (single-streamer
+ * scope, matching every other credential in this file) — chosen by the
+ * admin from whichever Pages `listManagedPages` (facebookOAuth.ts) returned
+ * during connect. The Page access token, not a user token, is what actually
+ * reads that Page's Live Video comments (EDD-V2 §4).
+ */
+export interface FacebookPageRecord {
+	pageId: string;
+	pageName: string;
+	pageAccessToken: string;
+	connectedAt: number;
+}
+
 interface AuthConfig {
 	passwordHash: string | null;
 	/** Signs session cookies (see tokens.ts). Rotating this invalidates every session at once. */
@@ -40,6 +54,7 @@ interface AuthConfig {
 	bearerTokens: BearerTokenRecord[];
 	urlTokens: UrlTokenRecord[];
 	platformTokens: Partial<Record<Platform, PlatformTokenRecord>>;
+	facebookPage: FacebookPageRecord | null;
 }
 
 const emptyConfig = (): AuthConfig => ({
@@ -47,7 +62,8 @@ const emptyConfig = (): AuthConfig => ({
 	sessionSecret: randomBytes(32).toString('hex'),
 	bearerTokens: [],
 	urlTokens: [],
-	platformTokens: {}
+	platformTokens: {},
+	facebookPage: null
 });
 
 async function load(): Promise<AuthConfig> {
@@ -222,4 +238,22 @@ export async function listPlatformConnections(
 		const record = config.platformTokens[platform];
 		return { platform, connected: !!record, connectedAt: record?.connectedAt ?? null };
 	});
+}
+
+export async function saveFacebookPage(page: Omit<FacebookPageRecord, 'connectedAt'>): Promise<void> {
+	const config = await load();
+	config.facebookPage = { ...page, connectedAt: Date.now() };
+	await save(config);
+}
+
+export async function getFacebookPage(): Promise<FacebookPageRecord | null> {
+	return (await load()).facebookPage;
+}
+
+export async function clearFacebookPage(): Promise<boolean> {
+	const config = await load();
+	if (!config.facebookPage) return false;
+	config.facebookPage = null;
+	await save(config);
+	return true;
 }
