@@ -3,7 +3,14 @@ import { getSessionSecret, isAuthEnabled, setAdminPassword, verifyBearerToken, v
 import { SESSION_COOKIE, verifySessionToken } from '$lib/server/auth/tokens';
 
 /** Reachable with no credential at all, even once a password is set — logging in has to start somewhere. */
-const PUBLIC_PATHS = new Set(['/api/health', '/api/auth/login', '/api/auth/logout']);
+const PUBLIC_PATHS = new Set([
+	'/api/health',
+	'/api/auth/login',
+	'/api/auth/logout',
+	'/api/auth/status',
+	'/api/auth/setup',
+	'/login'
+]);
 
 /** A URL token grants "page load + chat stream only" (EDD §6.1) — never CRUD, regardless of method. */
 const URL_TOKEN_PATHS = new Set(['/', '/api/chat/stream', '/api/overlay-profile']);
