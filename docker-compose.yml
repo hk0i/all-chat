@@ -14,6 +14,12 @@ services:
       # code change (see docs/EDD.md §3.2). Empty = use built-in defaults.
       KICK_PUSHER_KEY: ${KICK_PUSHER_KEY:-}
       KICK_PUSHER_HOST: ${KICK_PUSHER_HOST:-}
+      # Platform OAuth (docs/EDD-V2.md §3) — connecting Twitch/YouTube unlocks
+      # sending messages through them; reading works anonymously without these.
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - allchat-data:/data
     networks:
