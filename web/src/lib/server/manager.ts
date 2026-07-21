@@ -76,6 +76,12 @@ export class SourceManager {
 					}
 				});
 				source.onStatus((state, detail) => {
+					// Docker/journal visibility for connection trouble (no UI log viewer yet).
+					if (state === 'failed') {
+						console.error(`[${stable.platform}/${stable.channel}] failed${detail ? `: ${detail}` : ''}`);
+					} else if (state === 'reconnecting') {
+						console.warn(`[${stable.platform}/${stable.channel}] reconnecting${detail ? `: ${detail}` : ''}`);
+					}
 					stable.lastState = state;
 					for (const sub of stable.subscribers) {
 						sub.onStatus({
