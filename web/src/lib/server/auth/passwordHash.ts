@@ -33,12 +33,26 @@ const SALT_LENGTH = 16;
 /** scrypt needs roughly 128 * N * r bytes of working memory; Node's 32MB default maxmem is too small at N=131072. */
 const maxmemFor = (n: number, r: number) => 128 * n * r * 2;
 
+/**
+ * Hashes a password with scrypt for storage — a fresh random salt and the
+ * cost params are encoded into the returned string, so nothing else needs to
+ * persist alongside it. See the {@link https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt | OWASP Password Storage Cheat Sheet}
+ * for why scrypt is an acceptable choice and how the N/r/p params trade off.
+ */
 export async function hashPassword(password: string): Promise<string> {
 	const salt = randomBytes(SALT_LENGTH);
 	const derived = await scrypt(password, salt, KEY_LENGTH, { N, r: R, p: P, maxmem: maxmemFor(N, R) });
 	return `scrypt:${N}:${R}:${P}:${salt.toString('hex')}:${derived.toString('hex')}`;
 }
 
+/**
+ * Verifies a password against a hash produced by {@link hashPassword}. Reads
+ * the algorithm/cost params back out of `stored` rather than assuming
+ * today's constants, and compares in constant time via `timingSafeEqual` to
+ * avoid leaking match-length via response timing. See the
+ * {@link https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt | OWASP Password Storage Cheat Sheet}
+ * for the reasoning behind constant-time comparison and salted, per-password hashing.
+ */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
 	const parts = stored.split(':');
 	if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
