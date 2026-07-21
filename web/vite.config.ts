@@ -1,8 +1,14 @@
+import { readFileSync } from 'node:fs';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 
+const { version } = JSON.parse(readFileSync('./package.json', 'utf8')) as { version: string };
+
 export default defineConfig({
+	define: {
+		__APP_VERSION__: JSON.stringify(version)
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {

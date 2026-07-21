@@ -260,7 +260,10 @@
 <main class:overlay={overlayMode}>
 	{#if !overlayMode}
 		<header>
-			<h1>All Chat {#if profileName} / <span class="profile-name">{profileName}</span>{/if}</h1>
+			<h1>
+				All Chat {#if profileName} / <span class="profile-name">{profileName}</span>{/if}
+				<span class="app-version">v{__APP_VERSION__}</span>
+			</h1>
 			<div class="controls">
 				{#each Object.values(statuses) as status (status.sourceId)}
 					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
@@ -522,6 +525,13 @@
 	}
 
 	.profile-name {
+		color: var(--text-muted);
+	}
+
+	.app-version {
+		margin-left: 0.5rem;
+		font-size: 0.7rem;
+		font-weight: normal;
 		color: var(--text-muted);
 	}
 </style>
