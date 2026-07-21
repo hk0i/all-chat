@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,5 +79,49 @@ describe('URL tokens', () => {
 
 		expect(await config.revokeUrlToken(id)).toBe(true);
 		expect(await config.verifyUrlToken(token)).toBeUndefined();
+	});
+});
+
+describe('platform OAuth tokens', () => {
+	it('round-trips save/get/clear and preserves connectedAt across refreshes', async () => {
+		await config.savePlatformTokens('twitch', { accessToken: 'at-1', refreshToken: 'rt-1', expiresAt: 123 });
+		const first = await config.getPlatformTokens('twitch');
+		expect(first?.accessToken).toBe('at-1');
+		const connectedAt = first?.connectedAt;
+
+		// Simulate a token refresh: same platform, new access token.
+		await config.savePlatformTokens('twitch', { accessToken: 'at-2', expiresAt: 456 });
+		const refreshed = await config.getPlatformTokens('twitch');
+		expect(refreshed?.accessToken).toBe('at-2');
+		expect(refreshed?.connectedAt).toBe(connectedAt);
+
+		expect(await config.clearPlatformTokens('twitch')).toBe(true);
+		expect(await config.getPlatformTokens('twitch')).toBeUndefined();
+		expect(await config.clearPlatformTokens('twitch')).toBe(false);
+	});
+
+	it('reports connection status without exposing tokens', async () => {
+		await config.savePlatformTokens('youtube', { accessToken: 'at-1' });
+		const statuses = await config.listPlatformConnections(['twitch', 'youtube']);
+
+		expect(statuses).toEqual([
+			{ platform: 'twitch', connected: false, connectedAt: null },
+			{ platform: 'youtube', connected: true, connectedAt: expect.any(Number) }
+		]);
+	});
+
+	it('loads a pre-existing config.json that predates platformTokens', async () => {
+		writeFileSync(
+			join(dir, 'config.json'),
+			JSON.stringify({ passwordHash: null, sessionSecret: 'abc', bearerTokens: [], urlTokens: [] })
+		);
+		vi.resetModules();
+		config = await import('./config');
+
+		expect(await config.listPlatformConnections(['twitch'])).toEqual([
+			{ platform: 'twitch', connected: false, connectedAt: null }
+		]);
+		// The pre-existing sessionSecret survives the migration, not silently replaced.
+		expect(await config.getSessionSecret()).toBe('abc');
 	});
 });

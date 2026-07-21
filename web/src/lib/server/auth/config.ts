@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import type { BearerTokenInfo, UrlTokenInfo } from '@all-chat/contract';
+import type { BearerTokenInfo, Platform, PlatformConnectionInfo, UrlTokenInfo } from '@all-chat/contract';
 import { hashPassword, verifyPassword } from './passwordHash';
 import { generateToken, hashToken, verifyTokenHash } from './tokens';
 
@@ -24,24 +24,37 @@ export interface UrlTokenRecord extends UrlTokenInfo {
 	tokenHash: string;
 }
 
+/** Live OAuth credentials for one platform (EDD-V2 §3) — never leaves the server; only `PlatformConnectionInfo` (connected/not) crosses the API. */
+export interface PlatformTokenRecord {
+	accessToken: string;
+	refreshToken?: string;
+	/** Epoch ms; undefined if the provider didn't return an expiry. */
+	expiresAt?: number;
+	connectedAt: number;
+}
+
 interface AuthConfig {
 	passwordHash: string | null;
 	/** Signs session cookies (see tokens.ts). Rotating this invalidates every session at once. */
 	sessionSecret: string;
 	bearerTokens: BearerTokenRecord[];
 	urlTokens: UrlTokenRecord[];
+	platformTokens: Partial<Record<Platform, PlatformTokenRecord>>;
 }
 
 const emptyConfig = (): AuthConfig => ({
 	passwordHash: null,
 	sessionSecret: randomBytes(32).toString('hex'),
 	bearerTokens: [],
-	urlTokens: []
+	urlTokens: [],
+	platformTokens: {}
 });
 
 async function load(): Promise<AuthConfig> {
 	try {
-		return JSON.parse(await readFile(CONFIG_PATH, 'utf8')) as AuthConfig;
+		const parsed = JSON.parse(await readFile(CONFIG_PATH, 'utf8')) as Partial<AuthConfig>;
+		// Fields added after a config.json already existed on disk (e.g. platformTokens) need a default.
+		return { ...emptyConfig(), ...parsed };
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
 			const fresh = emptyConfig();
@@ -160,4 +173,36 @@ export async function verifyUrlToken(token: string): Promise<UrlTokenInfo | unde
 	await save(config);
 	const { tokenHash: _tokenHash, ...rest } = record;
 	return rest;
+}
+
+/** Stores a platform's OAuth tokens (fresh connect or post-refresh update). Preserves the original `connectedAt` across refreshes. */
+export async function savePlatformTokens(
+	platform: Platform,
+	tokens: { accessToken: string; refreshToken?: string; expiresAt?: number }
+): Promise<void> {
+	const config = await load();
+	const existing = config.platformTokens[platform];
+	config.platformTokens[platform] = { ...tokens, connectedAt: existing?.connectedAt ?? Date.now() };
+	await save(config);
+}
+
+export async function getPlatformTokens(platform: Platform): Promise<PlatformTokenRecord | undefined> {
+	return (await load()).platformTokens[platform];
+}
+
+export async function clearPlatformTokens(platform: Platform): Promise<boolean> {
+	const config = await load();
+	if (!config.platformTokens[platform]) return false;
+	delete config.platformTokens[platform];
+	await save(config);
+	return true;
+}
+
+/** Connected/not status for the given platforms — never the tokens themselves. */
+export async function listPlatformConnections(platforms: Platform[]): Promise<PlatformConnectionInfo[]> {
+	const config = await load();
+	return platforms.map((platform) => {
+		const record = config.platformTokens[platform];
+		return { platform, connected: !!record, connectedAt: record?.connectedAt ?? null };
+	});
 }

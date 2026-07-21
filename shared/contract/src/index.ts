@@ -125,3 +125,14 @@ export interface UrlTokenInfo {
 	createdAt: number;
 	lastUsedAt: number | null;
 }
+
+/**
+ * Whether a platform OAuth connection exists (EDD-V2 §3) — never the tokens
+ * themselves, which stay server-side. Connecting a platform unlocks sending
+ * messages through it (EDD-V2 §5); reading already works anonymously.
+ */
+export interface PlatformConnectionInfo {
+	platform: Platform;
+	connected: boolean;
+	connectedAt: number | null;
+}
