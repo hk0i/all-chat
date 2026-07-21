@@ -7,7 +7,7 @@
 **License:** This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)).
 **Builds on:** [EDD.md](EDD.md) (v1). Sections below reference v1 sections by number (e.g. [§6.1](EDD.md#61-auth-for-cloud-hosting-v2-design-v1-hooks)) rather than restate them.
 
-*Acronyms link to the [glossary](#8-glossary) on first use; terms already defined in [EDD.md §11](EDD.md#11-glossary) aren't redefined here.*
+*Acronyms link to the [glossary](#9-glossary) on first use; terms already defined in [EDD.md §11](EDD.md#11-glossary) aren't redefined here.*
 
 ## 1. Overview
 
@@ -66,6 +66,8 @@ Given [§3](#3-platform-auth-login-connections)'s token requirement, Facebook is
 3. Poll (or subscribe, if Graph API offers a push option for the account's tier) `/​{live-video-id}​/comments`, normalize into the same `ChatMessage` shape as the other three platforms ([EDD §4.1](EDD.md#41-normalized-message-model)) — Facebook becomes a fourth entry in the `platform` union, same fragment/badge model (badges likely empty — Facebook has no analogous badge concept, which is fine, the field is already optional).
 4. App-review requirements (Facebook gates live-comment read permissions behind review for anything beyond a handful of test users) mean this ships with a documented waiting period before it works for the general public, independent of engineering effort. Flag this to the streamer up front in the connect-Facebook UI rather than let it surface as a confusing failure later.
 
+**Self-hosted multiplier problem (flagged for v3, not designed here):** Facebook's App Review for Page permissions requires **Business Verification** — a legal-entity check — per registered app (per Client ID), not per hosting model. If every self-hosting streamer registers their own Facebook app to connect their own page, every one of them individually clears Business Verification — a real KYC hurdle for a hobbyist, independent of whether their All Chat instance is self-hosted or not. This is the actual pressure toward a SaaS-shaped architecture, not a hosting-convenience argument — see [§7](#7-distribution-beyond-docker)'s SaaS row and the open question below. Worth evaluating a smaller middle ground first: a single centrally-hosted **OAuth broker** — one All Chat-owned Facebook app, Business Verification cleared once, a thin hosted relay doing only the OAuth handshake and handing tokens back to each self-hosted instance — before committing to migrating the whole product to SaaS.
+
 ## 5. Chat input / send fan-out
 
 - One compose box in the main feed UI (not per-source) — the "everything is a URL, one unified feed" philosophy ([EDD §1](EDD.md#1-overview)) extends naturally to "one box out" mirroring "one feed in."
@@ -95,14 +97,20 @@ v1 ships one way: a Docker image ([EDD §6](EDD.md#6-deployment)), which assumes
 | **OBS plugin (native C++ dock)** | A compiled OBS plugin that runs the ingestion logic in-process inside OBS itself | High — throws away the "one app, any client" design ([EDD §1](EDD.md#1-overview)) for OBS-only distribution, and means rewriting or embedding the Node/TS ingestion logic in a plugin ABI | Poor fit — couples the whole product to OBS, breaks the mobile/native-client roadmap ([EDD §5.1](EDD.md#51-backend-language-decision-record-typescriptnode-vs-go-vs-swift-json-vs-protobuf)) that depends on the server being independent of any one client |
 | **Single self-contained binary (Bun compile / `pkg`)** | One executable, no Node install required, still runs as a local server the streamer starts and browses to | Low–Medium — mostly a build-target addition, [EDD §5.1](EDD.md#51-backend-language-decision-record-typescriptnode-vs-go-vs-swift-json-vs-protobuf) already flagged Bun as a footprint escape hatch | Good middle ground for technically-comfortable streamers who don't want Docker specifically; doesn't solve "no terminal at all" |
 | **One-click installer script** (`curl \| sh` / signed `.pkg`/`.msi`) | Installs Docker (or the standalone binary) and starts the service, adds a shortcut | Low | Reasonable stopgap, but "pipe a script to your shell" has its own trust/security optics, and doesn't give a dock-icon/menu-bar experience |
-| **Hosted SaaS option** | All Chat runs the service centrally; streamer just logs in | High — reintroduces multi-tenancy, billing, and abuse-handling that the whole v1 design ([EDD §1](EDD.md#1-overview): "self-hosted, one streamer per deployment") deliberately avoided | Conflicts with the project's stated scope; would effectively be a second product. Worth a future standalone discussion, not a v2 item |
+| **Hosted SaaS option** | All Chat runs the service centrally; streamer just logs in | High — reintroduces multi-tenancy, billing, and abuse-handling that the whole v1 design ([EDD §1](EDD.md#1-overview): "self-hosted, one streamer per deployment") deliberately avoided | Conflicts with the project's stated scope; would effectively be a second product. Worth a future standalone discussion, not a v2 item — see [§4](#4-facebook-live-support)'s Business Verification note and [§8](#8-open-questions) below, which is the actual driver, not general hosting convenience |
 | **Browser extension** | Extension-hosted UI, no server component | Not viable | YouTube/Kick ingestion and any future send-token storage need a real server process; an extension can't run the InnerTube poller or hold refresh tokens securely |
 
 **Recommendation:** desktop app wrapper (Tauri) as the primary non-technical path, single-binary build as a secondary option for people who already run local servers but don't want Docker specifically. Both distribute *the same server*, so this is packaging work layered on the existing architecture ([EDD §5.1](EDD.md#51-backend-language-decision-record-typescriptnode-vs-go-vs-swift-json-vs-protobuf)'s monorepo layout), not a fork. Docker remains the primary path for the audience it already serves (home server / LAN / cloud, Restreamer-adjacent setups); nothing about v2 distribution removes it.
 
 Open question worth flagging rather than resolving here: does the desktop wrapper still expose the HTTP API on `localhost` for OBS to reach (yes, it must — OBS docks/sources are still just browser navigations to a URL), and does packaging change anything about the [§6.1](EDD.md#61-auth-for-cloud-hosting-v2-design-v1-hooks) auth story? Answer, tentatively: no — `localhost`-only binding by default (no LAN/cloud exposure) removes most of the reason to turn on app auth in the first place for this audience, but the same auth system still applies if the streamer opts into LAN/cloud exposure from the desktop app's settings.
 
-## 8. Glossary
+## 8. Open questions
+
+1. **Self-hosted Facebook OAuth doesn't scale per-streamer (v3 candidate, not designed here).** Facebook's App Review for Page permissions requires Business Verification per registered app — if every self-hosting streamer registers their own Facebook app, each clears that individually (see [§4](#4-facebook-live-support)). Candidates, cheapest first: (a) do nothing — Facebook stays opt-in/self-service, streamers who want it clear their own review; (b) a thin centrally-hosted OAuth broker — one All Chat-owned Facebook app, verified once, relays tokens to self-hosted instances; (c) full SaaS migration — biggest lift, last resort, only if (b) proves insufficient. Not a v2 item; flagged for v3 scoping.
+2. Kick's official app-platform maturity ([§3](#3-platform-auth-login-connections)) — revisit once it stabilizes; may simplify or complicate the OAuth story relative to the current unofficial-API posture.
+3. Desktop-wrapper ([§7](#7-distribution-beyond-docker)) LAN/cloud exposure toggle: does turning it on need to nudge the streamer toward enabling app auth ([§6](#6-app-level-auth-building-out-edd-61)), or leave that fully manual?
+
+## 9. Glossary
 
 New terms introduced in this document; see [EDD.md §11](EDD.md#11-glossary) for everything else.
 
