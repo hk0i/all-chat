@@ -9,6 +9,9 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
  * credentials.
  */
 
+/** Cookie name for the admin session (EDD §6.1) — shared by hooks.server.ts and the login/logout routes. */
+export const SESSION_COOKIE = 'allchat_session';
+
 /** A fresh random token in its plaintext form — shown to the user once, at creation time, then never again. */
 export function generateToken(): string {
 	return randomBytes(32).toString('base64url');
