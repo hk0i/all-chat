@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Bumps package.json versions across the monorepo, commits, and tags a release.
 # Usage: scripts/release.sh 1.1.0
+#        scripts/release.sh 2.0.0-beta.1
 set -euo pipefail
 
 version="${1:-}"
-if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-	echo "Usage: scripts/release.sh <version>  (e.g. 1.1.0, no 'v' prefix)" >&2
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+	echo "Usage: scripts/release.sh <version>  (e.g. 1.1.0 or 2.0.0-beta, no 'v' prefix)" >&2
 	exit 1
 fi
 tag="v${version}"
