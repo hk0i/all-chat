@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Platform, Profile } from '@all-chat/contract';
 	import { page } from '$app/state';
+	import { copyToClipboard } from '$lib/clipboard';
 	import { toggleTheme } from '$lib/theme';
 
 	let { data } = $props();
@@ -154,21 +155,7 @@
 	}
 
 	async function copyUrl(url: string) {
-		try {
-			if (!navigator.clipboard?.writeText) throw new Error('clipboard API unavailable');
-			await navigator.clipboard.writeText(url);
-		} catch {
-			// navigator.clipboard only exists in secure contexts (https or
-			// localhost) and can be permission-denied even there. Reaching the
-			// app over plain http on a LAN IP — a normal self-hosted setup —
-			// lands here; the deprecated execCommand path still works.
-			const textarea = document.createElement('textarea');
-			textarea.value = url;
-			document.body.appendChild(textarea);
-			textarea.select();
-			document.execCommand('copy');
-			textarea.remove();
-		}
+		await copyToClipboard(url);
 		copiedUrl = url;
 		setTimeout(() => {
 			if (copiedUrl === url) copiedUrl = undefined;
@@ -219,7 +206,10 @@
 <main>
 	<header>
 		<h1><a href="/">All Chat</a> / profiles</h1>
-		<button onclick={() => toggleTheme()}>theme</button>
+		<div class="controls">
+			<a class="nav" href="/admin">admin</a>
+			<button onclick={() => toggleTheme()}>theme</button>
+		</div>
 	</header>
 
 	{#if error}
@@ -373,6 +363,22 @@
 	}
 
 	h1 a:hover {
+		color: var(--accent);
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.nav {
+		color: var(--text-muted);
+		text-decoration: none;
+		font-size: 0.9rem;
+	}
+
+	.nav:hover {
 		color: var(--accent);
 	}
 

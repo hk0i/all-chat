@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import type { BearerTokenInfo, UrlTokenInfo } from '@all-chat/contract';
 import { hashPassword, verifyPassword } from './passwordHash';
 import { generateToken, hashToken, verifyTokenHash } from './tokens';
 
@@ -15,22 +16,12 @@ import { generateToken, hashToken, verifyTokenHash } from './tokens';
 const DATA_DIR = process.env.DATA_DIR ?? 'data';
 const CONFIG_PATH = join(DATA_DIR, 'config.json');
 
-export interface BearerTokenRecord {
-	id: string;
-	name: string;
-	scope: 'read' | 'write';
+export interface BearerTokenRecord extends BearerTokenInfo {
 	tokenHash: string;
-	createdAt: number;
-	lastUsedAt: number | null;
 }
 
-export interface UrlTokenRecord {
-	id: string;
-	/** Which profile this overlay link is scoped to; null = whatever the URL's own `?profile=` says. */
-	profileId: string | null;
+export interface UrlTokenRecord extends UrlTokenInfo {
 	tokenHash: string;
-	createdAt: number;
-	lastUsedAt: number | null;
 }
 
 interface AuthConfig {
@@ -113,7 +104,7 @@ export async function createBearerToken(
 }
 
 /** Metadata only — never the token itself, which only ever existed in plaintext at creation time. */
-export async function listBearerTokens(): Promise<Omit<BearerTokenRecord, 'tokenHash'>[]> {
+export async function listBearerTokens(): Promise<BearerTokenInfo[]> {
 	const { bearerTokens } = await load();
 	return bearerTokens.map(({ tokenHash: _tokenHash, ...rest }) => rest);
 }
@@ -128,9 +119,7 @@ export async function revokeBearerToken(id: string): Promise<boolean> {
 }
 
 /** Verifies a bearer token and records its use; returns the matching record (sans hash) or undefined. */
-export async function verifyBearerToken(
-	token: string
-): Promise<Omit<BearerTokenRecord, 'tokenHash'> | undefined> {
+export async function verifyBearerToken(token: string): Promise<BearerTokenInfo | undefined> {
 	const config = await load();
 	const record = config.bearerTokens.find((t) => verifyTokenHash(token, t.tokenHash));
 	if (!record) return undefined;
@@ -149,7 +138,7 @@ export async function createUrlToken(profileId: string | null): Promise<{ id: st
 	return { id, token };
 }
 
-export async function listUrlTokens(): Promise<Omit<UrlTokenRecord, 'tokenHash'>[]> {
+export async function listUrlTokens(): Promise<UrlTokenInfo[]> {
 	const { urlTokens } = await load();
 	return urlTokens.map(({ tokenHash: _tokenHash, ...rest }) => rest);
 }
@@ -163,9 +152,7 @@ export async function revokeUrlToken(id: string): Promise<boolean> {
 	return true;
 }
 
-export async function verifyUrlToken(
-	token: string
-): Promise<Omit<UrlTokenRecord, 'tokenHash'> | undefined> {
+export async function verifyUrlToken(token: string): Promise<UrlTokenInfo | undefined> {
 	const config = await load();
 	const record = config.urlTokens.find((t) => verifyTokenHash(token, t.tokenHash));
 	if (!record) return undefined;

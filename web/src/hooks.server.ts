@@ -32,10 +32,13 @@ async function authorize(event: Parameters<Handle>[0]['event']): Promise<boolean
 	const sessionCookie = event.cookies.get(SESSION_COOKIE);
 	if (sessionCookie && verifySessionToken(await getSessionSecret(), sessionCookie)) return true;
 
+	// `scope: 'write'` is reserved for a future write-capable endpoint (e.g. sending
+	// chat, EDD-V2 §5) that will need its own explicit allowlisted check — it is
+	// deliberately NOT a blanket grant to mutate anything (profile CRUD, token
+	// management, etc.), which stays session-cookie-only.
 	const bearerMatch = event.request.headers.get('authorization')?.match(/^Bearer (.+)$/);
-	if (bearerMatch) {
-		const record = await verifyBearerToken(bearerMatch[1]);
-		if (record && (!isMutating(event.request.method) || record.scope === 'write')) return true;
+	if (bearerMatch && !isMutating(event.request.method)) {
+		if (await verifyBearerToken(bearerMatch[1])) return true;
 	}
 
 	const urlToken = event.url.searchParams.get('token');

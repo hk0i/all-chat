@@ -269,6 +269,7 @@
 					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
 				{/each}
 				<a class="nav" href="/profiles">profiles</a>
+				<a class="nav" href="/admin">admin</a>
 				<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
 				<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
 				<button onclick={() => (theme = toggleTheme())}>theme</button>

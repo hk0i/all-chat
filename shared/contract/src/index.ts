@@ -102,3 +102,26 @@ export type StreamEvent =
 	| { event: 'hello'; data: HelloEvent }
 	| { event: 'status'; data: StatusEvent }
 	| { event: 'message'; data: ChatMessage };
+
+/**
+ * Bearer token metadata (EDD §6.1) — never includes the token itself, which
+ * only ever exists in plaintext at creation time. `scope` is reserved for a
+ * future write-capable endpoint (e.g. sending chat, EDD-V2 §5); nothing
+ * currently checks it beyond `read` vs not-`read`.
+ */
+export interface BearerTokenInfo {
+	id: string;
+	name: string;
+	scope: 'read' | 'write';
+	createdAt: number;
+	lastUsedAt: number | null;
+}
+
+/** Read-only URL token metadata (EDD §6.1) — grants page load + chat stream only, scoped to one profile. */
+export interface UrlTokenInfo {
+	id: string;
+	/** Which profile this overlay link is scoped to; null = whatever the URL's own `?profile=` says. */
+	profileId: string | null;
+	createdAt: number;
+	lastUsedAt: number | null;
+}
