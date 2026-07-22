@@ -6,6 +6,11 @@
 
 	let { data } = $props();
 
+	/** Connected Facebook Pages (EDD-V2 §4) — facebook sources pick one of these instead of typing a channel. */
+	let facebookPages = $derived(
+		data.platformProviders.find((p) => p.platform === 'facebook')?.connections ?? []
+	);
+
 	/* Local working copy on purpose: mutations land via API calls below, not re-runs of load. */
 	// svelte-ignore state_referenced_locally
 	let profiles = $state<Profile[]>(data.profiles);
@@ -24,6 +29,8 @@
 		id?: string;
 		platform: Platform;
 		channel: string;
+		/** Which connected Page to read (facebook only, EDD-V2 §4) — set together with channel when a Page is picked. */
+		connectionId?: string;
 		label: string;
 	}
 
@@ -52,8 +59,16 @@
 	const CHANNEL_PLACEHOLDER: Record<Platform, string> = {
 		twitch: 'channel name',
 		kick: 'chatroom id (or channel slug)',
-		youtube: '@handle, video URL, or video id'
+		youtube: '@handle, video URL, or video id',
+		facebook: '' // unused — facebook picks a connected Page from a dropdown, not free text
 	};
+
+	/** Facebook has no channel to type — picking a Page sets both channel (display) and connectionId (lookup key) together. */
+	function selectFacebookPage(source: DraftSource, connectionId: string) {
+		const page = facebookPages.find((p) => p.id === connectionId);
+		source.connectionId = page?.id;
+		source.channel = page?.accountLabel ?? '';
+	}
 
 	function edit(profile: Profile) {
 		error = undefined;
@@ -65,6 +80,7 @@
 				id: source.id,
 				platform: source.platform,
 				channel: source.channel,
+				connectionId: source.connectionId,
 				label: source.label ?? ''
 			}))
 		};
@@ -98,10 +114,11 @@
 		error = undefined;
 		const body = JSON.stringify({
 			name: draft.name,
-			sources: draft.sources.map(({ id, platform, channel, label }) => ({
+			sources: draft.sources.map(({ id, platform, channel, connectionId, label }) => ({
 				...(id ? { id } : {}),
 				platform,
 				channel,
+				...(platform === 'facebook' && connectionId ? { connectionId } : {}),
 				...(label.trim() ? { label: label.trim() } : {})
 			}))
 		});
@@ -298,12 +315,32 @@
 						<option value="twitch">Twitch</option>
 						<option value="kick">Kick</option>
 						<option value="youtube">YouTube</option>
+						<option value="facebook">Facebook</option>
 					</select>
-					<input
-						class="channel"
-						bind:value={source.channel}
-						placeholder={CHANNEL_PLACEHOLDER[source.platform]}
-					/>
+					{#if source.platform === 'facebook'}
+						{#if facebookPages.length === 0}
+							<span class="channel hint">
+								No connected Pages — <a href="/admin">connect one</a> first
+							</span>
+						{:else}
+							<select
+								class="channel"
+								value={source.connectionId ?? ''}
+								onchange={(e) => selectFacebookPage(source, e.currentTarget.value)}
+							>
+								<option value="" disabled>pick a Page…</option>
+								{#each facebookPages as pageConn (pageConn.id)}
+									<option value={pageConn.id}>{pageConn.accountLabel}</option>
+								{/each}
+							</select>
+						{/if}
+					{:else}
+						<input
+							class="channel"
+							bind:value={source.channel}
+							placeholder={CHANNEL_PLACEHOLDER[source.platform]}
+						/>
+					{/if}
 					<input class="label" bind:value={source.label} placeholder="label (optional)" />
 					<button aria-label="move up" disabled={index === 0} onclick={() => moveSource(index, -1)}
 						>↑</button
@@ -508,6 +545,11 @@
 	.source-row .channel {
 		flex: 2;
 		min-width: 0;
+	}
+
+	.source-row .channel.hint {
+		font-size: 0.85rem;
+		color: var(--text-muted);
 	}
 
 	.source-row .label {

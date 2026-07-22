@@ -465,6 +465,10 @@
 		border-left-color: var(--platform-youtube);
 	}
 
+	.feed li.platform-facebook {
+		border-left-color: var(--platform-facebook);
+	}
+
 	button.off {
 		opacity: 0.5;
 	}

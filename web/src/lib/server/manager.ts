@@ -1,5 +1,6 @@
 import type { ChatMessage, Platform, SourceConfig, SourceState, StatusEvent } from '@all-chat/contract';
 import type { ChatSource } from './sources/types';
+import { FacebookSource } from './sources/facebook';
 import { KickSource } from './sources/kick';
 import { TwitchSource } from './sources/twitch';
 import { YouTubeSource } from './sources/youtube';
@@ -20,12 +21,18 @@ interface LiveSource {
 	channel: string;
 }
 
-/** Upstream connections are shared per platform+channel (EDD §3.4). */
-const connectionKey = (platform: Platform, channel: string) => `${platform}:${channel.toLowerCase()}`;
+/**
+ * Upstream connections are shared per platform+channel (EDD §3.4). Facebook
+ * has no channel string to key on (it's just the Page's display name,
+ * EDD-V2 §4) — connectionId is the real upstream identity there, so key on
+ * that instead.
+ */
+const connectionKey = (platform: Platform, channel: string, connectionId?: string) =>
+	platform === 'facebook' ? `facebook:${connectionId}` : `${platform}:${channel.toLowerCase()}`;
 
-export type CreateSource = (platform: Platform, sourceId: string, channel: string) => ChatSource;
+export type CreateSource = (platform: Platform, sourceId: string, channel: string, connectionId?: string) => ChatSource;
 
-const defaultCreateSource: CreateSource = (platform, sourceId, channel) => {
+const defaultCreateSource: CreateSource = (platform, sourceId, channel, connectionId) => {
 	switch (platform) {
 		case 'twitch':
 			return new TwitchSource(sourceId, channel);
@@ -33,6 +40,9 @@ const defaultCreateSource: CreateSource = (platform, sourceId, channel) => {
 			return new KickSource(sourceId, channel);
 		case 'youtube':
 			return new YouTubeSource(sourceId, channel);
+		case 'facebook':
+			if (!connectionId) throw new Error('facebook source requires a connectionId');
+			return new FacebookSource(sourceId, connectionId);
 	}
 };
 
@@ -52,14 +62,14 @@ export class SourceManager {
 		const joined: string[] = [];
 
 		for (const config of sources) {
-			const key = connectionKey(config.platform, config.channel);
+			const key = connectionKey(config.platform, config.channel, config.connectionId);
 			if (seen.has(key)) continue;
 			seen.add(key);
 			joined.push(key);
 
 			let entry = this.live.get(key);
 			if (!entry) {
-				const source = this.createSource(config.platform, config.id, config.channel);
+				const source = this.createSource(config.platform, config.id, config.channel, config.connectionId);
 				entry = {
 					source,
 					refCount: 0,

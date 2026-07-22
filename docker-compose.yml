@@ -20,6 +20,10 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Facebook has no anonymous read path — these are required just to
+      # ingest chat, not only to send (docs/EDD-V2.md §4).
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
     volumes:
       - allchat-data:/data
     networks:

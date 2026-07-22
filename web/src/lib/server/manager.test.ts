@@ -26,6 +26,16 @@ describe('SourceManager', () => {
 		unsubscribe();
 	});
 
+	it('keys facebook sources by connectionId, not channel (no anonymous read to key on)', () => {
+		const manager = newManager();
+		const unsubscribe = manager.subscribe(subscriber(), [
+			{ id: 'a', platform: 'facebook', channel: 'My Page', connectionId: 'conn-1' },
+			{ id: 'b', platform: 'facebook', channel: 'My Page', connectionId: 'conn-2' }
+		]);
+		expect(manager.liveConnectionCount).toBe(2);
+		unsubscribe();
+	});
+
 	it('deduplicates exact duplicates within one subscription', () => {
 		const manager = newManager();
 		const unsubscribe = manager.subscribe(subscriber(), [

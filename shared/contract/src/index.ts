@@ -9,7 +9,7 @@
 /** Bumped on any breaking change to the shapes below. Sent in the `hello` event. */
 export const API_VERSION = 1;
 
-export type Platform = 'twitch' | 'kick' | 'youtube';
+export type Platform = 'twitch' | 'kick' | 'youtube' | 'facebook';
 
 export interface Profile {
 	/** Stable slug, generated from name. */
@@ -24,8 +24,15 @@ export interface SourceConfig {
 	/** Stable per-source id (referenced by ChatMessage.sourceId). */
 	id: string;
 	platform: Platform;
-	/** twitch/kick channel slug, or a YouTube URL / video ID / @handle. */
+	/** twitch/kick channel slug, a YouTube URL / video ID / @handle, or (facebook) the connected Page's display name. */
 	channel: string;
+	/**
+	 * Which `PlatformConnectionInfo.id` to read through — required for
+	 * facebook (EDD-V2 §4: no anonymous read path, unlike the other three
+	 * platforms), since `channel` there is just the Page's display name and
+	 * can't itself resolve to a Page access token.
+	 */
+	connectionId?: string;
 	/** Optional display name, e.g. "Main Twitch", "Indie YT". */
 	label?: string;
 }
@@ -136,19 +143,9 @@ export interface UrlTokenInfo {
  * (e.g. a co-streamer's, or an alt) is a normal, unremarkable action, not a
  * replacement for the first.
  */
-/**
- * Platforms that can have an OAuth connection (EDD-V2 §3) — a superset of
- * `Platform`, since Facebook needs a connection just to *read* (EDD-V2 §4:
- * no anonymous path exists), not only to unlock sending like Twitch/YouTube.
- * Kept separate from `Platform` (which governs `SourceConfig`/`ChatMessage`,
- * i.e. actual ingestion) so this can grow ahead of ingestion support —
- * Facebook connections exist before any `FacebookSource` `ChatSource` does.
- */
-export type ConnectablePlatform = Platform | 'facebook';
-
 export interface PlatformConnectionInfo {
 	id: string;
-	platform: ConnectablePlatform;
+	platform: Platform;
 	/** The connected account's own display name/handle, fetched at connect time (Twitch login, YouTube channel title, Facebook Page name) — how multiple connections on the same platform are told apart in the UI. */
 	accountLabel: string;
 	connectedAt: number;
@@ -156,7 +153,7 @@ export interface PlatformConnectionInfo {
 
 /** Per-platform summary for the control panel: whether the operator has configured OAuth for it at all, plus every currently connected account. */
 export interface PlatformProviderStatus {
-	platform: ConnectablePlatform;
+	platform: Platform;
 	/** Whether the operator has set the provider's client id/secret env vars at all. */
 	configured: boolean;
 	connections: PlatformConnectionInfo[];

@@ -16,7 +16,7 @@
  */
 
 /** Meta deprecates Graph API versions on a ~2-year cycle; override without a code change if this drifts, same pattern as Kick's Pusher key (EDD §3.2). */
-const GRAPH_API_VERSION = process.env.FACEBOOK_GRAPH_API_VERSION ?? 'v21.0';
+export const GRAPH_API_VERSION = process.env.FACEBOOK_GRAPH_API_VERSION ?? 'v21.0';
 
 export interface FacebookAppConfig {
 	appId: string;
