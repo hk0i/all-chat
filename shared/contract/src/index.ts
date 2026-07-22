@@ -111,10 +111,23 @@ export type StreamEvent =
 	| { event: 'message'; data: ChatMessage };
 
 /**
+ * Per-target outcome of a `POST /api/chat/send` (EDD-V2 §5) — fan-out is
+ * independent per source, so one send can partially succeed (e.g. Twitch
+ * goes through, YouTube rate-limits) rather than an all-or-nothing result.
+ */
+export interface ChatSendResult {
+	sourceId: string;
+	platform: Platform;
+	ok: boolean;
+	/** Present when ok is false — expired token, rate limit, platform rejection, etc. */
+	error?: string;
+}
+
+/**
  * Bearer token metadata (EDD §6.1) — never includes the token itself, which
- * only ever exists in plaintext at creation time. `scope` is reserved for a
- * future write-capable endpoint (e.g. sending chat, EDD-V2 §5); nothing
- * currently checks it beyond `read` vs not-`read`.
+ * only ever exists in plaintext at creation time. `write` unlocks exactly
+ * one mutating route, `POST /api/chat/send` (EDD-V2 §5) — hooks.server.ts's
+ * explicit allowlist, not a blanket grant to mutate anything else.
  */
 export interface BearerTokenInfo {
 	id: string;

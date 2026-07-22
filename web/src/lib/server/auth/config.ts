@@ -38,6 +38,8 @@ export interface PlatformConnectionRecord extends PlatformConnectionInfo {
 	expiresAt?: number;
 	/** Facebook only — which Page this (page-scoped) access token belongs to; needed to know which Page's Live Video comments to poll/post to (EDD-V2 §4). */
 	facebookPageId?: string;
+	/** Twitch only — the connected account's own numeric user id, the `sender_id` Helix's Send Chat Message endpoint requires (EDD-V2 §5). */
+	platformUserId?: string;
 }
 
 interface AuthConfig {

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { page } from '$app/state';
-	import type { ChatMessage, Profile, StatusEvent } from '@all-chat/contract';
+	import type { ChatMessage, ChatSendResult, Profile, StatusEvent } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
 	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
@@ -32,6 +32,8 @@
 	let streamError = $state<string | undefined>();
 	/** Display name of the connected profile (?profile=), for the header title — undefined for ad-hoc ?source= or before it resolves. */
 	let profileName = $state<string | undefined>();
+	/** The active profile's id — set whenever there's a real profile to send through (?profile= or the switchable overlay pointer); undefined for ad-hoc ?source= (no persisted sources to look up connections against). */
+	let profileId = $state<string | undefined>();
 	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
 	let overlayNoProfile = $state(false);
 	/** Polling interval — how often a profile-agnostic overlay re-checks which profile it should show. */
@@ -147,6 +149,38 @@
 		if (feedElement) feedElement.scrollTop = feedElement.scrollHeight;
 	}
 
+	/** Compose box (EDD-V2 §5) — one box out, mirroring the one unified feed in. Sends to every connected source in the active profile, no per-platform picking (explicitly descoped for now). */
+	let composeText = $state('');
+	let sending = $state(false);
+	let sendResults = $state<ChatSendResult[] | undefined>();
+	let sendError = $state<string | undefined>();
+
+	async function sendMessage() {
+		const text = composeText.trim();
+		if (!text || !profileId || sending) return;
+		sending = true;
+		sendResults = undefined;
+		sendError = undefined;
+		try {
+			const response = await fetch('/api/chat/send', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ profileId, text })
+			});
+			if (!response.ok) {
+				sendError = ((await response.json()) as { message?: string }).message ?? response.statusText;
+				return;
+			}
+			const body = (await response.json()) as { results: ChatSendResult[] };
+			sendResults = body.results;
+			composeText = '';
+		} catch (cause) {
+			sendError = (cause as Error).message;
+		} finally {
+			sending = false;
+		}
+	}
+
 	// Keep pinned to the newest message unless the user scrolled up.
 	$effect(() => {
 		void messages.length;
@@ -204,7 +238,10 @@
 				fetch(`/api/profiles/${encodeURIComponent(profileParam)}`)
 					.then((response) => (response.ok ? (response.json() as Promise<Profile>) : null))
 					.then((profile) => {
-						if (profile) profileName = profile.name;
+						if (profile) {
+							profileName = profile.name;
+							profileId = profile.id;
+						}
 					})
 					.catch(() => {});
 			}
@@ -216,10 +253,11 @@
 			// first check never triggers the "no profile selected" state below.
 			let activeProfileId: string | null | undefined;
 
-			const applyPointer = (profileId: string | null) => {
-				if (activeProfileId !== undefined && profileId === activeProfileId) return;
-				activeProfileId = profileId;
-				overlayNoProfile = !profileId;
+			const applyPointer = (pointerProfileId: string | null) => {
+				if (activeProfileId !== undefined && pointerProfileId === activeProfileId) return;
+				activeProfileId = pointerProfileId;
+				profileId = pointerProfileId ?? undefined;
+				overlayNoProfile = !pointerProfileId;
 				closeStream?.();
 				closeStream = undefined;
 				messages = [];
@@ -228,9 +266,9 @@
 				streamError = undefined;
 				messageBuffer = [];
 				receivedAt.clear();
-				if (!profileId) return;
+				if (!pointerProfileId) return;
 				const target = new URLSearchParams(params);
-				target.set('profile', profileId);
+				target.set('profile', pointerProfileId);
 				connectStream(target);
 			};
 
@@ -329,6 +367,34 @@
 			</button>
 		{/if}
 	</div>
+
+	{#if profileId && !overlayMode}
+		<form class="compose" onsubmit={(e) => (e.preventDefault(), sendMessage())}>
+			<input
+				bind:value={composeText}
+				placeholder="Send a message to every connected platform…"
+				disabled={sending}
+			/>
+			<button class="primary" type="submit" disabled={sending || !composeText.trim()}>
+				{sending ? 'sending…' : 'send'}
+			</button>
+		</form>
+		{#if sendError}
+			<p class="error-banner" role="alert">{sendError}</p>
+		{:else if sendResults}
+			{#if sendResults.length === 0}
+				<p class="hint">No connected accounts to send through — connect one in admin first.</p>
+			{:else}
+				<p class="send-results">
+					{#each sendResults as result (result.sourceId)}
+						<span class="send-result" class:failed={!result.ok} title={result.error}>
+							<PlatformIcon platform={result.platform} />{result.ok ? 'sent' : result.error}
+						</span>
+					{/each}
+				</p>
+			{/if}
+		{/if}
+	{/if}
 </main>
 
 <style>
@@ -412,6 +478,48 @@
 		border: 1px solid var(--status-failed);
 		border-radius: 4px;
 		padding: 0.5rem 0.75rem;
+	}
+
+	.compose {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.5rem 0;
+	}
+
+	.compose input {
+		flex: 1;
+		min-width: 0;
+		background: var(--bg);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.4rem 0.6rem;
+		font: inherit;
+	}
+
+	.compose input:focus {
+		outline: none;
+		border-color: var(--accent);
+	}
+
+	.compose button.primary {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: var(--neutral-800);
+		font-weight: 600;
+	}
+
+	.send-results {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin: 0 0 0.5rem;
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+
+	.send-result.failed {
+		color: var(--status-failed);
 	}
 
 	.feed-wrap {

@@ -6,10 +6,10 @@
 
 	let { data } = $props();
 
-	/** Connected Facebook Pages (EDD-V2 §4) — facebook sources pick one of these instead of typing a channel. */
-	let facebookPages = $derived(
-		data.platformProviders.find((p) => p.platform === 'facebook')?.connections ?? []
-	);
+	/** Connections for a platform (EDD-V2 §3) — facebook sources pick one instead of typing a channel; other platforms pick one optionally, to send through (EDD-V2 §5). */
+	function connectionsFor(platform: Platform) {
+		return data.platformProviders.find((p) => p.platform === platform)?.connections ?? [];
+	}
 
 	/* Local working copy on purpose: mutations land via API calls below, not re-runs of load. */
 	// svelte-ignore state_referenced_locally
@@ -65,7 +65,7 @@
 
 	/** Facebook has no channel to type — picking a Page sets both channel (display) and connectionId (lookup key) together. */
 	function selectFacebookPage(source: DraftSource, connectionId: string) {
-		const page = facebookPages.find((p) => p.id === connectionId);
+		const page = connectionsFor('facebook').find((p) => p.id === connectionId);
 		source.connectionId = page?.id;
 		source.channel = page?.accountLabel ?? '';
 	}
@@ -118,7 +118,7 @@
 				...(id ? { id } : {}),
 				platform,
 				channel,
-				...(platform === 'facebook' && connectionId ? { connectionId } : {}),
+				...(connectionId ? { connectionId } : {}),
 				...(label.trim() ? { label: label.trim() } : {})
 			}))
 		});
@@ -318,7 +318,7 @@
 						<option value="facebook">Facebook</option>
 					</select>
 					{#if source.platform === 'facebook'}
-						{#if facebookPages.length === 0}
+						{#if connectionsFor('facebook').length === 0}
 							<span class="channel hint">
 								No connected Pages — <a href="/admin">connect one</a> first
 							</span>
@@ -329,7 +329,7 @@
 								onchange={(e) => selectFacebookPage(source, e.currentTarget.value)}
 							>
 								<option value="" disabled>pick a Page…</option>
-								{#each facebookPages as pageConn (pageConn.id)}
+								{#each connectionsFor('facebook') as pageConn (pageConn.id)}
 									<option value={pageConn.id}>{pageConn.accountLabel}</option>
 								{/each}
 							</select>
@@ -340,6 +340,19 @@
 							bind:value={source.channel}
 							placeholder={CHANNEL_PLACEHOLDER[source.platform]}
 						/>
+						{#if connectionsFor(source.platform).length > 0}
+							<select
+								class="send-via"
+								value={source.connectionId ?? ''}
+								onchange={(e) => (source.connectionId = e.currentTarget.value || undefined)}
+								title="Which connected account to send through — leave as read only to just read this source, same as v1"
+							>
+								<option value="">read only</option>
+								{#each connectionsFor(source.platform) as conn (conn.id)}
+									<option value={conn.id}>send via {conn.accountLabel}</option>
+								{/each}
+							</select>
+						{/if}
 					{/if}
 					<input class="label" bind:value={source.label} placeholder="label (optional)" />
 					<button aria-label="move up" disabled={index === 0} onclick={() => moveSource(index, -1)}
@@ -553,6 +566,11 @@
 	}
 
 	.source-row .label {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.source-row .send-via {
 		flex: 1;
 		min-width: 0;
 	}

@@ -15,6 +15,9 @@ const PUBLIC_PATHS = new Set([
 /** A URL token grants "page load + chat stream only" (EDD §6.1) — never CRUD, regardless of method. */
 const URL_TOKEN_PATHS = new Set(['/', '/api/chat/stream', '/api/overlay-profile']);
 
+/** The one explicit path a write-scoped bearer token can mutate (EDD-V2 §5) — never a blanket grant to every mutating route. */
+const WRITE_BEARER_PATHS = new Set(['/api/chat/send']);
+
 const isMutating = (method: string) => method !== 'GET' && method !== 'HEAD';
 
 let envPasswordChecked = false;
@@ -32,13 +35,15 @@ async function authorize(event: Parameters<Handle>[0]['event']): Promise<boolean
 	const sessionCookie = event.cookies.get(SESSION_COOKIE);
 	if (sessionCookie && verifySessionToken(await getSessionSecret(), sessionCookie)) return true;
 
-	// `scope: 'write'` is reserved for a future write-capable endpoint (e.g. sending
-	// chat, EDD-V2 §5) that will need its own explicit allowlisted check — it is
-	// deliberately NOT a blanket grant to mutate anything (profile CRUD, token
+	// `scope: 'write'` unlocks exactly one mutating route — chat send
+	// (EDD-V2 §5) — via the explicit allowlist below. It is deliberately NOT
+	// a blanket grant to mutate anything else (profile CRUD, token
 	// management, etc.), which stays session-cookie-only.
 	const bearerMatch = event.request.headers.get('authorization')?.match(/^Bearer (.+)$/);
-	if (bearerMatch && !isMutating(event.request.method)) {
-		if (await verifyBearerToken(bearerMatch[1])) return true;
+	if (bearerMatch) {
+		const info = await verifyBearerToken(bearerMatch[1]);
+		if (info && !isMutating(event.request.method)) return true;
+		if (info?.scope === 'write' && WRITE_BEARER_PATHS.has(event.url.pathname)) return true;
 	}
 
 	const urlToken = event.url.searchParams.get('token');

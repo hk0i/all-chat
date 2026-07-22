@@ -20,17 +20,22 @@ export function normalizeSources(raw: unknown): SourceConfig[] {
 		if (typeof source.channel !== 'string' || !source.channel.trim()) {
 			throw error(400, 'each source needs a channel');
 		}
+		const connectionId =
+			typeof source.connectionId === 'string' && source.connectionId.trim() ? source.connectionId.trim() : undefined;
+
 		// Facebook has no anonymous read path (EDD-V2 §4) — channel is just the
 		// Page's display name, so connectionId is what actually resolves to a
-		// Page access token at ingestion time.
-		if (source.platform === 'facebook' && (typeof source.connectionId !== 'string' || !source.connectionId.trim())) {
+		// Page access token at ingestion time. Other platforms treat it as
+		// optional — which connected account (if any) a source sends through
+		// (EDD-V2 §5); absent means read-only, same as v1 behavior.
+		if (source.platform === 'facebook' && !connectionId) {
 			throw error(400, 'facebook sources need a connectionId (pick a connected Page)');
 		}
 		return {
 			id: typeof source.id === 'string' && source.id ? source.id : newSourceId(),
 			platform: source.platform,
 			channel: source.channel.trim(),
-			...(source.platform === 'facebook' ? { connectionId: (source.connectionId as string).trim() } : {}),
+			...(connectionId ? { connectionId } : {}),
 			...(typeof source.label === 'string' && source.label ? { label: source.label } : {})
 		};
 	});

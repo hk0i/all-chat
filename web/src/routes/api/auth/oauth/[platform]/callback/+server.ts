@@ -28,10 +28,10 @@ export const GET: RequestHandler = async ({ params, cookies, url }) => {
 	if (!config) throw error(400, `${params.platform} OAuth is not configured on this deployment`);
 
 	let tokens;
-	let accountLabel;
+	let account;
 	try {
 		tokens = await exchangeCodeForTokens(config, code);
-		accountLabel = await fetchAccountLabel(params.platform, tokens.accessToken);
+		account = await fetchAccountLabel(params.platform, tokens.accessToken);
 	} catch (cause) {
 		// A bad client secret, an already-used/expired code, or the provider being
 		// down all land here — a real, expected failure mode for an admin
@@ -40,7 +40,12 @@ export const GET: RequestHandler = async ({ params, cookies, url }) => {
 	}
 	// Always a new connection, never an overwrite — connecting a second account
 	// on the same platform is normal (EDD-V2 §3's contract doc comment).
-	await createPlatformConnection({ platform: params.platform, accountLabel, ...tokens });
+	await createPlatformConnection({
+		platform: params.platform,
+		accountLabel: account.label,
+		platformUserId: account.platformUserId,
+		...tokens
+	});
 
 	redirect(302, '/admin');
 };

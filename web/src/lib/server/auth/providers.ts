@@ -22,7 +22,8 @@ export function twitchOAuthConfig(origin: string): OAuthProviderConfig | undefin
 		clientId,
 		clientSecret,
 		redirectUri: `${origin}/api/auth/oauth/twitch/callback`,
-		scope: 'chat:edit'
+		// user:write:chat — Helix's Send Chat Message endpoint (EDD-V2 §5).
+		scope: 'user:write:chat'
 	};
 }
 
@@ -70,26 +71,33 @@ export function isProviderConfigured(platform: OAuthPlatform): boolean {
 	}
 }
 
+export interface AccountLookup {
+	label: string;
+	/** The connected account's own platform-native id — Twitch's Helix Send Chat Message endpoint needs it as `sender_id` (EDD-V2 §5). Absent where nothing downstream needs it (YouTube). */
+	platformUserId?: string;
+}
+
 /**
- * The connecting account's own display name/handle, fetched right after
- * token exchange — needed to tell multiple connections on the same platform
- * apart in the UI (EDD-V2 §3's contract doc comment explains why there can
- * be more than one). Twitch and YouTube tokens carry no identity info on
- * their own; this is one extra API call per connect, not per request.
+ * The connecting account's own display name/handle (and, where a later send
+ * path needs it, its platform-native id), fetched right after token
+ * exchange — the label is needed to tell multiple connections on the same
+ * platform apart in the UI (EDD-V2 §3's contract doc comment explains why
+ * there can be more than one). Twitch and YouTube tokens carry no identity
+ * info on their own; this is one extra API call per connect, not per request.
  */
 export async function fetchAccountLabel(
 	platform: OAuthPlatform,
 	accessToken: string,
 	fetchImpl: typeof fetch = fetch
-): Promise<string> {
+): Promise<AccountLookup> {
 	switch (platform) {
 		case 'twitch': {
 			const response = await fetchImpl('https://api.twitch.tv/helix/users', {
 				headers: { Authorization: `Bearer ${accessToken}`, 'Client-Id': process.env.TWITCH_CLIENT_ID ?? '' }
 			});
 			if (!response.ok) throw new Error(`Twitch user lookup failed: ${response.status} ${await response.text()}`);
-			const body = (await response.json()) as { data: { display_name: string }[] };
-			return body.data[0]?.display_name ?? 'Twitch account';
+			const body = (await response.json()) as { data: { id: string; display_name: string }[] };
+			return { label: body.data[0]?.display_name ?? 'Twitch account', platformUserId: body.data[0]?.id };
 		}
 		case 'youtube': {
 			const response = await fetchImpl('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
@@ -97,7 +105,7 @@ export async function fetchAccountLabel(
 			});
 			if (!response.ok) throw new Error(`YouTube channel lookup failed: ${response.status} ${await response.text()}`);
 			const body = (await response.json()) as { items: { snippet: { title: string } }[] };
-			return body.items[0]?.snippet.title ?? 'YouTube channel';
+			return { label: body.items[0]?.snippet.title ?? 'YouTube channel' };
 		}
 	}
 }
