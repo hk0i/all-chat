@@ -1,6 +1,7 @@
 import type { ChatSendResult, SourceConfig } from '@all-chat/contract';
 import { getPlatformConnection } from './auth/config';
 import { sendTwitchMessage } from './sources/twitch/send';
+import { sendYouTubeMessage } from './sources/youtube/send';
 
 async function sendToSource(source: SourceConfig & { connectionId: string }, text: string): Promise<ChatSendResult> {
 	const fail = (message: string): ChatSendResult => ({ sourceId: source.id, platform: source.platform, ok: false, error: message });
@@ -24,7 +25,8 @@ async function sendToSource(source: SourceConfig & { connectionId: string }, tex
 				break;
 			}
 			case 'youtube':
-				throw new Error('YouTube send is not implemented yet');
+				await sendYouTubeMessage({ channel: source.channel, accessToken: connection.accessToken }, text);
+				break;
 			case 'kick':
 				throw new Error('Kick has no OAuth/send support yet (EDD-V2 §3, §8)');
 			case 'facebook':

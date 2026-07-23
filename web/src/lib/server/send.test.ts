@@ -8,6 +8,9 @@ vi.mock('./auth/config', () => ({ getPlatformConnection }));
 const { sendTwitchMessage } = vi.hoisted(() => ({ sendTwitchMessage: vi.fn() }));
 vi.mock('./sources/twitch/send', () => ({ sendTwitchMessage }));
 
+const { sendYouTubeMessage } = vi.hoisted(() => ({ sendYouTubeMessage: vi.fn() }));
+vi.mock('./sources/youtube/send', () => ({ sendYouTubeMessage }));
+
 const { sendChatMessage } = await import('./send');
 
 const TWITCH_CONNECTION: PlatformConnectionRecord = {
@@ -31,6 +34,7 @@ describe('sendChatMessage', () => {
 	beforeEach(() => {
 		getPlatformConnection.mockReset();
 		sendTwitchMessage.mockReset();
+		sendYouTubeMessage.mockReset();
 	});
 
 	it('skips sources with no connected account entirely — not reported as a failure', async () => {
@@ -63,6 +67,7 @@ describe('sendChatMessage', () => {
 	it('reports a per-target failure without touching other targets when one platform errors', async () => {
 		getPlatformConnection.mockResolvedValue(TWITCH_CONNECTION);
 		sendTwitchMessage.mockRejectedValue(new Error('Twitch send failed: 429 rate limited'));
+		sendYouTubeMessage.mockResolvedValue(undefined);
 
 		const results = await sendChatMessage(
 			[source({ id: 'a' }), source({ id: 'b', platform: 'youtube', connectionId: 'conn-2' })],
@@ -71,7 +76,20 @@ describe('sendChatMessage', () => {
 
 		expect(results).toEqual([
 			{ sourceId: 'a', platform: 'twitch', ok: false, error: 'Twitch send failed: 429 rate limited' },
-			{ sourceId: 'b', platform: 'youtube', ok: false, error: 'YouTube send is not implemented yet' }
+			{ sourceId: 'b', platform: 'youtube', ok: true }
 		]);
+	});
+
+	it('sends through a connected YouTube source', async () => {
+		getPlatformConnection.mockResolvedValue({ ...TWITCH_CONNECTION, platform: 'youtube', platformUserId: undefined });
+		sendYouTubeMessage.mockResolvedValue(undefined);
+
+		const results = await sendChatMessage([source({ platform: 'youtube', channel: 'dQw4w9WgXcQ' })], 'hello chat');
+
+		expect(results).toEqual([{ sourceId: 's1', platform: 'youtube', ok: true }]);
+		expect(sendYouTubeMessage).toHaveBeenCalledWith(
+			{ channel: 'dQw4w9WgXcQ', accessToken: 'user-token' },
+			'hello chat'
+		);
 	});
 });
