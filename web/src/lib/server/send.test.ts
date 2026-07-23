@@ -11,6 +11,9 @@ vi.mock('./sources/twitch/send', () => ({ sendTwitchMessage }));
 const { sendYouTubeMessage } = vi.hoisted(() => ({ sendYouTubeMessage: vi.fn() }));
 vi.mock('./sources/youtube/send', () => ({ sendYouTubeMessage }));
 
+const { sendFacebookMessage } = vi.hoisted(() => ({ sendFacebookMessage: vi.fn() }));
+vi.mock('./sources/facebook/send', () => ({ sendFacebookMessage }));
+
 const { sendChatMessage } = await import('./send');
 
 const TWITCH_CONNECTION: PlatformConnectionRecord = {
@@ -35,6 +38,7 @@ describe('sendChatMessage', () => {
 		getPlatformConnection.mockReset();
 		sendTwitchMessage.mockReset();
 		sendYouTubeMessage.mockReset();
+		sendFacebookMessage.mockReset();
 	});
 
 	it('skips sources with no connected account entirely — not reported as a failure', async () => {
@@ -91,5 +95,32 @@ describe('sendChatMessage', () => {
 			{ channel: 'dQw4w9WgXcQ', accessToken: 'user-token' },
 			'hello chat'
 		);
+	});
+
+	it('sends through a connected Facebook source', async () => {
+		getPlatformConnection.mockResolvedValue({
+			...TWITCH_CONNECTION,
+			platform: 'facebook',
+			platformUserId: undefined,
+			facebookPageId: '111'
+		});
+		sendFacebookMessage.mockResolvedValue(undefined);
+
+		const results = await sendChatMessage([source({ platform: 'facebook', channel: 'My Streaming Page' })], 'hello chat');
+
+		expect(results).toEqual([{ sourceId: 's1', platform: 'facebook', ok: true }]);
+		expect(sendFacebookMessage).toHaveBeenCalledWith(
+			{ facebookPageId: '111', accessToken: 'user-token' },
+			'hello chat'
+		);
+	});
+
+	it('reports a per-target failure when a Facebook connection is missing its Page id', async () => {
+		getPlatformConnection.mockResolvedValue({ ...TWITCH_CONNECTION, platform: 'facebook', platformUserId: undefined });
+		const results = await sendChatMessage([source({ platform: 'facebook', channel: 'My Streaming Page' })], 'hi');
+		expect(results).toEqual([
+			{ sourceId: 's1', platform: 'facebook', ok: false, error: expect.stringContaining('reconnect') }
+		]);
+		expect(sendFacebookMessage).not.toHaveBeenCalled();
 	});
 });

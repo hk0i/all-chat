@@ -42,8 +42,13 @@ export interface FacebookPage {
 	accessToken: string;
 }
 
-/** `pages_show_list` to enumerate managed Pages, `pages_read_engagement` to read their Live Video comments. */
-const SCOPE = 'pages_show_list,pages_read_engagement';
+/**
+ * `pages_show_list` to enumerate managed Pages, `pages_read_engagement` to
+ * read their Live Video comments, `pages_manage_engagement` to post them
+ * (EDD-V2 §5) — added after read shipped, so Pages connected before this
+ * scope existed will need reconnecting once send is used against them.
+ */
+const SCOPE = 'pages_show_list,pages_read_engagement,pages_manage_engagement';
 
 export function buildFacebookAuthorizationUrl(config: FacebookAppConfig, state: string): string {
 	const url = new URL(`https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`);

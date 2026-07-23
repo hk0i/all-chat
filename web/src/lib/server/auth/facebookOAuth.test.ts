@@ -22,7 +22,7 @@ describe('buildFacebookAuthorizationUrl', () => {
 		expect(url.pathname).toMatch(/\/dialog\/oauth$/);
 		expect(url.searchParams.get('client_id')).toBe('app-123');
 		expect(url.searchParams.get('redirect_uri')).toBe(config.redirectUri);
-		expect(url.searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement');
+		expect(url.searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,pages_manage_engagement');
 		expect(url.searchParams.get('state')).toBe('nonce-abc');
 	});
 });

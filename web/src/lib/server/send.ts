@@ -1,6 +1,7 @@
 import type { ChatSendResult, SourceConfig } from '@all-chat/contract';
 import { getPlatformConnection } from './auth/config';
 import { ensureFreshToken } from './auth/tokenRefresh';
+import { sendFacebookMessage } from './sources/facebook/send';
 import { sendTwitchMessage } from './sources/twitch/send';
 import { sendYouTubeMessage } from './sources/youtube/send';
 
@@ -34,8 +35,11 @@ async function sendToSource(source: SourceConfig & { connectionId: string }, tex
 				break;
 			case 'kick':
 				throw new Error('Kick has no OAuth/send support yet (EDD-V2 §3, §8)');
-			case 'facebook':
-				throw new Error('Facebook send is not implemented yet');
+			case 'facebook': {
+				if (!active.facebookPageId) throw new Error('missing Facebook Page id — reconnect this account');
+				await sendFacebookMessage({ facebookPageId: active.facebookPageId, accessToken: active.accessToken }, text);
+				break;
+			}
 		}
 		return { sourceId: source.id, platform: source.platform, ok: true };
 	} catch (cause) {
