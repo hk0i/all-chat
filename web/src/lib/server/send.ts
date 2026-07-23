@@ -1,5 +1,6 @@
 import type { ChatSendResult, SourceConfig } from '@all-chat/contract';
 import { getPlatformConnection } from './auth/config';
+import { ensureFreshToken } from './auth/tokenRefresh';
 import { sendTwitchMessage } from './sources/twitch/send';
 import { sendYouTubeMessage } from './sources/youtube/send';
 
@@ -10,14 +11,18 @@ async function sendToSource(source: SourceConfig & { connectionId: string }, tex
 	if (!connection) return fail('connection not found — reconnect this account in admin');
 
 	try {
+		// Refreshes the access token first if it's expired/expiring — a failed
+		// refresh (dead refresh token) surfaces as a normal per-target error
+		// below, same as any other send failure.
+		const active = await ensureFreshToken(connection);
 		switch (source.platform) {
 			case 'twitch': {
-				if (!connection.platformUserId) throw new Error('missing platform user id — reconnect this account');
+				if (!active.platformUserId) throw new Error('missing platform user id — reconnect this account');
 				await sendTwitchMessage(
 					{
 						channel: source.channel,
-						accessToken: connection.accessToken,
-						senderId: connection.platformUserId,
+						accessToken: active.accessToken,
+						senderId: active.platformUserId,
 						clientId: process.env.TWITCH_CLIENT_ID ?? ''
 					},
 					text
@@ -25,7 +30,7 @@ async function sendToSource(source: SourceConfig & { connectionId: string }, tex
 				break;
 			}
 			case 'youtube':
-				await sendYouTubeMessage({ channel: source.channel, accessToken: connection.accessToken }, text);
+				await sendYouTubeMessage({ channel: source.channel, accessToken: active.accessToken }, text);
 				break;
 			case 'kick':
 				throw new Error('Kick has no OAuth/send support yet (EDD-V2 §3, §8)');
