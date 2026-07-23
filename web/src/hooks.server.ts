@@ -1,6 +1,12 @@
 import { error, type Handle } from '@sveltejs/kit';
 import { getSessionSecret, isAuthEnabled, setAdminPassword, verifyBearerToken, verifyUrlToken } from '$lib/server/auth/config';
+import { loadSecretsFile } from '$lib/server/secretsFile';
 import { SESSION_COOKIE, verifySessionToken } from '$lib/server/auth/tokens';
+
+// Runs once at server startup (module-level, before any request) — must
+// happen before providers.ts/facebookOAuth.ts read process.env for the
+// first time (EDD-V2 §6).
+loadSecretsFile();
 
 /** Reachable with no credential at all, even once a password is set — logging in has to start somewhere. */
 const PUBLIC_PATHS = new Set([
