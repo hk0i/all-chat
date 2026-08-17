@@ -7,6 +7,7 @@
 	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
 	import { readableColor } from '$lib/colorContrast';
+	import { formatTimestamp } from '$lib/formatTime';
 	import { openChatStream } from '$lib/stream';
 	import { currentTheme, toggleTheme, type Theme } from '$lib/theme';
 
@@ -346,7 +347,9 @@
 				class={showIcons ? `striped platform-${message.platform}` : undefined}
 				out:fade={fadeSeconds !== undefined ? { duration: 400 } : { duration: 0 }}
 			>
-				{#if showIcons}<PlatformIcon
+				{#if showTimestamps}<time class="timestamp" datetime={new Date(message.timestamp).toISOString()}
+						>{formatTimestamp(message.timestamp)}</time
+					>{/if}{#if showIcons}<PlatformIcon
 						platform={message.platform}
 					/>{#if duplicatePlatforms.has(message.platform)}<span class="source-tag"
 							>{message.channel}</span
@@ -590,6 +593,13 @@
 
 	button.off {
 		opacity: 0.5;
+	}
+
+	.timestamp {
+		font-size: 0.7em;
+		color: var(--text-muted);
+		margin-right: 0.4rem;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.source-tag {
