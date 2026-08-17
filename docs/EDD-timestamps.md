@@ -1,11 +1,13 @@
 # All Chat — Message Timestamps (EDD-timestamps)
 
-**Status:** Draft
-**Date:** 2026-08-17
-**Scope:** Display existing message timestamps in the feed UI
-**Author:** Gregory McQuillan
-**License:** This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)).
-**Builds on:** [EDD.md](EDD.md) (v1) and [EDD-V2.md](EDD-V2.md). Sections below reference both by anchor rather than restate them.
+| | |
+|---|---|
+| **Status** | Draft |
+| **Date** | 2026-08-17 |
+| **Scope** | Display existing message timestamps in the feed UI |
+| **Author** | Gregory McQuillan |
+| **License** | This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)). |
+| **Builds on** | [EDD.md](EDD.md) (v1) and [EDD-V2.md](EDD-V2.md). Sections below reference both by anchor rather than restate them. |
 
 ## 1. Overview
 
