@@ -343,12 +343,13 @@
 	<div class="feed-wrap">
 		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
 			{#each messages as message (message.id)}
+			{@const messageDate = new Date(message.timestamp)}
 			<li
 				class={showIcons ? `striped platform-${message.platform}` : undefined}
 				out:fade={fadeSeconds !== undefined ? { duration: 400 } : { duration: 0 }}
 			>
-				{#if showTimestamps}<time class="timestamp" datetime={new Date(message.timestamp).toISOString()}
-						>{formatTimestamp(message.timestamp)}</time
+				{#if showTimestamps}<time class="timestamp" datetime={messageDate.toISOString()}
+						>{formatTimestamp(messageDate)}</time
 					>{/if}{#if showIcons}<PlatformIcon
 						platform={message.platform}
 					/>{#if duplicatePlatforms.has(message.platform)}<span class="source-tag"
