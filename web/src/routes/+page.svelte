@@ -53,6 +53,13 @@
 	let showAvatars = $state(true);
 
 	/**
+	 * Timestamps default on in the dock/browser, off in overlay mode (visual
+	 * noise on stream) — `&timestamps=` always wins when present, same split
+	 * as `showAvatars` above (docs/EDD-timestamps.md §7).
+	 */
+	let showTimestamps = $state(true);
+
+	/**
 	 * Drives author-name contrast clamping (colorContrast.ts) — the pre-paint
 	 * script in app.html sets data-theme before this ever renders, so it's
 	 * safe to read synchronously here.
@@ -196,6 +203,9 @@
 		showIcons = params.get('icons') !== '0';
 		showAvatars = params.has('avatars')
 			? params.get('avatars') !== '0'
+			: params.get('overlay') !== '1';
+		showTimestamps = params.has('timestamps')
+			? params.get('timestamps') !== '0'
 			: params.get('overlay') !== '1';
 
 		if (params.has('fade')) {
