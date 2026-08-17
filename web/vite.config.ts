@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
 			// Fail loudly instead of silently bumping to the next free port —
 			// OAuth redirect_uri is built from url.origin at request time, so a
 			// silent port shift breaks every registered redirect URI (Twitch/
-			// Google/Facebook all match it exactly, docs/EDD-V2.md §3).
+			// Google/Facebook all match it exactly, docs/2026-07-20-all-chat-v2.edd.md §3).
 			strictPort: true
 		},
 		test: {

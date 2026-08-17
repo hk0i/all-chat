@@ -3,7 +3,7 @@
  * and every client (web UI, OBS views, native mobile apps, bots).
  *
  * Licensed MIT (see LICENSE in this directory) so generated client types can
- * be embedded in any codebase. See docs/EDD.md §4.1 and §9.4.
+ * be embedded in any codebase. See docs/2026-07-19-all-chat.edd.md §4.1 and §9.4.
  */
 
 /** Bumped on any breaking change to the shapes below. Sent in the `hello` event. */

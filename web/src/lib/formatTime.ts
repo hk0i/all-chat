@@ -4,7 +4,7 @@
  * feed's `<time datetime>` attribute) can share one `Date` instead of
  * constructing it twice. No relative ("2m ago") mode — that needs a ticking
  * interval, not worth it against a feed documented at 10k+ msg/min
- * (docs/EDD.md §7).
+ * (docs/2026-07-19-all-chat.edd.md §7).
  */
 export function formatTimestamp(date: Date): string {
 	return date.toLocaleTimeString();

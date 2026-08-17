@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 /**
  * Optional, more-secure alternative to plain env vars for secrets
- * (docs/EDD-V2.md §6) — a single dotenv-format file, either bind-mounted
+ * (docs/2026-07-20-all-chat-v2.edd.md §6) — a single dotenv-format file, either bind-mounted
  * as a Docker secret (never shows up in `docker inspect`, unlike
  * `environment:` values) or just a chmod-600 file for bare `npm run dev`,
  * same convention as `~/.ssh/`. `.env` keeps working standalone — real env

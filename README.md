@@ -5,7 +5,7 @@ YouTube chat into one merged feed, with OBS dock and on-stream overlay support.
 The chat-side companion to a video multistream stack like
 [Restreamer](https://datarhei.github.io/restreamer/).
 
-Read the full design in [docs/EDD.md](docs/EDD.md).
+Read the full design in [docs/2026-07-19-all-chat.edd.md](docs/2026-07-19-all-chat.edd.md).
 
 > **Status: v1.** Read-only unified feed, live against Twitch, Kick, and
 > YouTube, with a profile manager, OBS dock/overlay support, and dark/light
@@ -91,5 +91,5 @@ Try the stream pipeline against a live channel:
 ## License
 
 GPL-3.0-only, except `shared/contract/` (MIT) and `docs/` (CC BY-SA 4.0,
-[docs/LICENSE](docs/LICENSE)) — see [docs/EDD.md §9.4](docs/EDD.md) for the
+[docs/LICENSE](docs/LICENSE)) — see [docs/2026-07-19-all-chat.edd.md §9.4](docs/2026-07-19-all-chat.edd.md) for the
 reasoning.

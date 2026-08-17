@@ -56,7 +56,7 @@
 	/**
 	 * Timestamps default on in the dock/browser, off in overlay mode (visual
 	 * noise on stream) — `&timestamps=` always wins when present, same split
-	 * as `showAvatars` above (docs/EDD-timestamps.md §7).
+	 * as `showAvatars` above (docs/2026-08-17-message-timestamps.edd.md §7).
 	 */
 	let showTimestamps = $state(true);
 

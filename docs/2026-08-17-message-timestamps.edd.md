@@ -7,7 +7,7 @@
 | **Scope** | Display existing message timestamps in the feed UI |
 | **Author** | Gregory McQuillan |
 | **License** | This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)). |
-| **Builds on** | [EDD.md](EDD.md) (v1) and [EDD-V2.md](EDD-V2.md). Sections below reference both by anchor rather than restate them. |
+| **Builds on** | [2026-07-19-all-chat.edd.md](2026-07-19-all-chat.edd.md) (v1) and [2026-07-20-all-chat-v2.edd.md](2026-07-20-all-chat-v2.edd.md). Sections below reference both by anchor rather than restate them. |
 
 ## 1. Overview
 
@@ -20,13 +20,13 @@ A related but explicitly separate concern: client-side message-history caching i
 ### Goals
 
 - Display each message's timestamp in the feed.
-- Toggleable via a `&timestamps=` query param and a header button, consistent with the existing `icons`/`avatars` toggles ([EDD §4.2](EDD.md#42-unified-feed-behavior), `+page.svelte`).
+- Toggleable via a `&timestamps=` query param and a header button, consistent with the existing `icons`/`avatars` toggles ([EDD §4.2](2026-07-19-all-chat.edd.md#42-unified-feed-behavior), `+page.svelte`).
 - Overlay-safe default: on in the dock, off in overlay mode, matching `showAvatars`'s existing rationale (visual noise on-stream).
 
 ### Non-goals
 
 - Message history persistence/caching (client-side or server-side) — future work, own design doc when scoped.
-- Relative/live-updating time ("2m ago") — rejected for this pass; would require a ticking interval against a feed documented at 10k+ msg/min ([EDD §7](EDD.md#7-risks), risks table), for marginal benefit over absolute time.
+- Relative/live-updating time ("2m ago") — rejected for this pass; would require a ticking interval against a feed documented at 10k+ msg/min ([EDD §7](2026-07-19-all-chat.edd.md#7-risks), risks table), for marginal benefit over absolute time.
 - Any change to `ChatMessage`, the normalizers, or the SSE transport — all already correct (§3).
 
 ## 3. Current state — where the value already lives
@@ -108,7 +108,7 @@ stateDiagram-v2
 
 ## 7. Design decisions
 
-- **Format: absolute, locale time** via `toLocaleTimeString()`. No ticking interval — cheap even at the feed's documented throughput ([EDD §7](EDD.md#7-risks)), unlike a relative-time format that would need to re-render as time passes.
+- **Format: absolute, locale time** via `toLocaleTimeString()`. No ticking interval — cheap even at the feed's documented throughput ([EDD §7](2026-07-19-all-chat.edd.md#7-risks)), unlike a relative-time format that would need to re-render as time passes.
 - **Default visibility: on in the dock, off in overlay.** Same split as `showAvatars` (`+page.svelte:51-53,197-199`) — the operator's own chat view benefits from timestamps; the transparent on-stream view (typically an OBS browser source) shouldn't gain visual noise by default. Overridable per-instance via `&timestamps=`.
 - **Toggle mechanism: query param + header button**, mirroring `showIcons`/`showAvatars` exactly rather than inventing a new pattern.
 
