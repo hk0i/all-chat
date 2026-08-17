@@ -1,10 +1,12 @@
 # All Chat — Engineering Design Doc (EDD)
 
-**Status:** Draft
-**Date:** 2026-07-19
-**Scope:** [MVP](#def-mvp) (v1)
-**Author:** Gregory McQuillan
-**License:** This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)).
+| | |
+|---|---|
+| **Status** | Draft |
+| **Date** | 2026-07-19 |
+| **Scope** | [MVP](#def-mvp) (v1) |
+| **Author** | Gregory McQuillan |
+| **License** | This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)). |
 
 *Acronyms link to the [glossary](#11-glossary) on first use.*
 

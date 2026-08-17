@@ -1,11 +1,13 @@
 # All Chat — Engineering Design Doc v2 (EDD-V2)
 
-**Status:** Draft
-**Date:** 2026-07-20
-**Scope:** v2
-**Author:** Gregory McQuillan
-**License:** This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)).
-**Builds on:** [EDD.md](EDD.md) (v1). Sections below reference v1 sections by number (e.g. [§6.1](EDD.md#61-auth-for-cloud-hosting-v2-design-v1-hooks)) rather than restate them.
+| | |
+|---|---|
+| **Status** | Draft |
+| **Date** | 2026-07-20 |
+| **Scope** | v2 |
+| **Author** | Gregory McQuillan |
+| **License** | This document is CC BY-SA 4.0 — see [docs/LICENSE](LICENSE). Source code elsewhere in this repo is licensed separately (root [LICENSE](../LICENSE), [shared/contract/LICENSE](../shared/contract/LICENSE)). |
+| **Builds on** | [EDD.md](EDD.md) (v1). Sections below reference v1 sections by number (e.g. [§6.1](EDD.md#61-auth-for-cloud-hosting-v2-design-v1-hooks)) rather than restate them. |
 
 *Acronyms link to the [glossary](#9-glossary) on first use; terms already defined in [EDD.md §11](EDD.md#11-glossary) aren't redefined here.*
 
