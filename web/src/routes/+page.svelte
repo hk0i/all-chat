@@ -320,6 +320,7 @@
 				<a class="nav" href="/admin">admin</a>
 				<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
 				<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
+				<button class:off={!showTimestamps} onclick={() => (showTimestamps = !showTimestamps)}>time</button>
 				<button onclick={() => (theme = toggleTheme())}>theme</button>
 			</div>
 		</header>
