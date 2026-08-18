@@ -35,6 +35,9 @@
 	let profileName = $state<string | undefined>();
 	/** The active profile's id — set whenever there's a real profile to send through (?profile= or the switchable overlay pointer); undefined for ad-hoc ?source= (no persisted sources to look up connections against). */
 	let profileId = $state<string | undefined>();
+	/** Full profile list for the header quick-switcher dropdown — fetched once on mount. */
+	let profileList = $state<Profile[]>([]);
+	let profileListError = $state<string | undefined>();
 	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
 	let overlayNoProfile = $state(false);
 	/** Polling interval — how often a profile-agnostic overlay re-checks which profile it should show. */
@@ -198,6 +201,14 @@
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
 		theme = currentTheme();
+
+		fetch('/api/profiles')
+			.then((response) =>
+				response.ok ? (response.json() as Promise<Profile[]>) : Promise.reject(new Error(response.statusText))
+			)
+			.then((list) => (profileList = list))
+			.catch((cause) => (profileListError = (cause as Error).message));
+
 		const params = page.url.searchParams;
 		overlayMode = params.get('overlay') === '1';
 		document.body.classList.toggle('overlay', overlayMode);
