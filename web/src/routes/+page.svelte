@@ -802,6 +802,16 @@
 		cursor: pointer;
 	}
 
+	.profile-name-trigger:hover,
+	.profile-name-trigger[aria-expanded='true'] {
+		color: var(--accent);
+	}
+
+	.profile-name-trigger:focus-visible {
+		outline: 1px solid var(--accent);
+		outline-offset: 2px;
+	}
+
 	.profile-name-trigger .caret {
 		font-size: 0.7em;
 	}
@@ -812,6 +822,8 @@
 		left: 0;
 		z-index: 10;
 		min-width: 10rem;
+		max-height: 16rem;
+		overflow-y: auto;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 4px;
@@ -824,14 +836,25 @@
 		text-align: left;
 		background: none;
 		border: none;
+		border-radius: 4px;
 		padding: 0.35rem 0.5rem;
 		font: inherit;
 		color: var(--text);
 		cursor: pointer;
 	}
 
+	.profile-option:hover {
+		background: var(--bg);
+	}
+
+	.profile-option:focus-visible {
+		outline: 1px solid var(--accent);
+		outline-offset: -1px;
+	}
+
 	.profile-option.active {
 		color: var(--accent);
+		font-weight: bold;
 	}
 
 	.profile-dropdown-empty,
