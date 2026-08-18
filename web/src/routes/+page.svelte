@@ -220,6 +220,26 @@
 		};
 	});
 
+	let closeStream: (() => void) | undefined;
+
+	function connectStream(streamParams: URLSearchParams) {
+		closeStream?.();
+		closeStream = openChatStream(streamParams.toString(), {
+			onHello: () => (connected = true),
+			onMessage: (message) => {
+				messageBuffer.push(message);
+				scheduleFlush();
+			},
+			onStatus: (status) => {
+				statuses = { ...statuses, [status.sourceId]: status };
+			},
+			onError: (message) => {
+				connected = false;
+				streamError = message;
+			}
+		});
+	}
+
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
 		theme = currentTheme();
@@ -249,26 +269,6 @@
 			fadeSeconds = DEFAULT_OVERLAY_FADE_SECONDS;
 		}
 		if (fadeSeconds !== undefined) fadeSweepHandle = setInterval(sweepExpired, 1000);
-
-		let closeStream: (() => void) | undefined;
-
-		function connectStream(streamParams: URLSearchParams) {
-			closeStream?.();
-			closeStream = openChatStream(streamParams.toString(), {
-				onHello: () => (connected = true),
-				onMessage: (message) => {
-					messageBuffer.push(message);
-					scheduleFlush();
-				},
-				onStatus: (status) => {
-					statuses = { ...statuses, [status.sourceId]: status };
-				},
-				onError: (message) => {
-					connected = false;
-					streamError = message;
-				}
-			});
-		}
 
 		const explicitTarget = params.has('profile') || params.has('source');
 		hasParams = explicitTarget;
