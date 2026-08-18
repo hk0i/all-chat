@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | Complete |
 | **Date** | 2026-08-18 |
 | **Scope** | Convert `$props()` destructures in `web/src` from inline object-literal types (or no types) to named `Props`/`PageProps`/`LayoutProps` types |
 | **Author** | Gregory McQuillan |
