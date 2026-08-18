@@ -4,10 +4,10 @@
 	import { page } from '$app/state';
 	import type { Profile } from '@all-chat/contract';
 	import ComposeForm from '$lib/components/feed/ComposeForm.svelte';
+	import DockHeader from '$lib/components/feed/DockHeader.svelte';
 	import MessageFeed from '$lib/components/feed/MessageFeed.svelte';
-	import ProfileSwitcher from '$lib/components/feed/ProfileSwitcher.svelte';
 	import { createChatSession } from '$lib/chat/session.svelte';
-	import { currentTheme, toggleTheme, type Theme } from '$lib/theme';
+	import { currentTheme, type Theme } from '$lib/theme';
 
 	/**
 	 * Default `fade` when overlay mode doesn't specify one — an overlay left
@@ -213,32 +213,19 @@
 
 <main class:overlay={overlayMode}>
 	{#if !overlayMode}
-		<header>
-			<h1>
-				All Chat {#if profileName}
-					/ <ProfileSwitcher
-						{profileId}
-						{profileName}
-						{profileList}
-						{profileListError}
-						{profileSwitchError}
-						onswitch={switchProfile}
-					/>
-				{/if}
-				<span class="app-version">v{__APP_VERSION__}</span>
-			</h1>
-			<div class="controls">
-				{#each Object.values(session.statuses) as status (status.sourceId)}
-					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
-				{/each}
-				<a class="nav" href="/profiles">profiles</a>
-				<a class="nav" href="/admin">admin</a>
-				<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
-				<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
-				<button class:off={!showTimestamps} onclick={() => (showTimestamps = !showTimestamps)}>time</button>
-				<button onclick={() => (theme = toggleTheme())}>theme</button>
-			</div>
-		</header>
+		<DockHeader
+			{profileId}
+			{profileName}
+			{profileList}
+			{profileListError}
+			{profileSwitchError}
+			onswitch={switchProfile}
+			statuses={session.statuses}
+			bind:showIcons
+			bind:showAvatars
+			bind:showTimestamps
+			bind:theme
+		/>
 	{/if}
 
 	{#if session.streamError}
@@ -271,68 +258,6 @@
 		padding: 0 1rem;
 	}
 
-	header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--border);
-	}
-
-	h1 {
-		font-size: 1.1rem;
-		margin: 0;
-	}
-
-	.controls {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.status {
-		width: 0.6rem;
-		height: 0.6rem;
-		border-radius: 50%;
-		background: var(--text-muted);
-	}
-
-	.status-live {
-		background: var(--status-live);
-	}
-
-	.status-reconnecting,
-	.status-connecting {
-		background: var(--status-reconnecting);
-	}
-
-	.status-failed {
-		background: var(--status-failed);
-	}
-
-	button {
-		background: var(--surface);
-		color: var(--text);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		padding: 0.25rem 0.6rem;
-		cursor: pointer;
-	}
-
-	button:hover {
-		border-color: var(--accent);
-	}
-
-	.nav {
-		color: var(--text-muted);
-		text-decoration: none;
-		font-size: 0.9rem;
-	}
-
-	.nav:hover {
-		color: var(--accent);
-	}
-
 	.hint {
 		color: var(--text-muted);
 	}
@@ -344,19 +269,8 @@
 		padding: 0.5rem 0.75rem;
 	}
 
-	button.off {
-		opacity: 0.5;
-	}
-
 	main.overlay {
 		max-width: none;
 		padding: 0.5rem 1rem;
-	}
-
-	.app-version {
-		margin-left: 0.5rem;
-		font-size: 0.7rem;
-		font-weight: normal;
-		color: var(--text-muted);
 	}
 </style>
