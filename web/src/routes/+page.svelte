@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { ChatMessage, ChatSendResult, Profile, StatusEvent } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
@@ -38,6 +39,7 @@
 	/** Full profile list for the header quick-switcher dropdown — fetched once on mount. */
 	let profileList = $state<Profile[]>([]);
 	let profileListError = $state<string | undefined>();
+	let profileSwitchError = $state<string | undefined>();
 	/** Header quick-switcher dropdown open state. */
 	let profileDropdownOpen = $state(false);
 	let profileSwitcherEl = $state<HTMLElement | undefined>();
@@ -240,6 +242,43 @@
 		});
 	}
 
+	/** Header dropdown selection: switches the local view and best-effort repoints the overlay pointer, mirroring the /profiles "watch" link + ★ toggle. */
+	async function switchProfile(target: Profile) {
+		profileDropdownOpen = false;
+		if (target.id === profileId) return;
+		profileSwitchError = undefined;
+
+		messages = [];
+		statuses = {};
+		connected = false;
+		streamError = undefined;
+		messageBuffer = [];
+		receivedAt.clear();
+
+		profileName = target.name;
+		profileId = target.id;
+		hasParams = true;
+		overlayNoProfile = false;
+
+		const nextParams = new URLSearchParams(page.url.searchParams);
+		nextParams.set('profile', target.id);
+		connectStream(nextParams);
+		goto(`/?${nextParams.toString()}`, { replaceState: true, noScroll: true, keepFocus: true });
+
+		try {
+			const response = await fetch('/api/overlay-profile', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ profileId: target.id })
+			});
+			if (!response.ok) {
+				profileSwitchError = ((await response.json()) as { message?: string }).message ?? response.statusText;
+			}
+		} catch (cause) {
+			profileSwitchError = (cause as Error).message;
+		}
+	}
+
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
 		theme = currentTheme();
@@ -377,7 +416,13 @@
 					{#if profileDropdownOpen}
 						<div class="profile-dropdown" role="menu">
 							{#each profileList as p (p.id)}
-								<button type="button" role="menuitem" class="profile-option" class:active={p.id === profileId}>
+								<button
+									type="button"
+									role="menuitem"
+									class="profile-option"
+									class:active={p.id === profileId}
+									onclick={() => switchProfile(p)}
+								>
 									{p.name}
 								</button>
 							{:else}
@@ -385,6 +430,9 @@
 							{/each}
 							{#if profileListError}
 								<p class="profile-dropdown-error">{profileListError}</p>
+							{/if}
+							{#if profileSwitchError}
+								<p class="profile-dropdown-error">{profileSwitchError}</p>
 							{/if}
 						</div>
 					{/if}
