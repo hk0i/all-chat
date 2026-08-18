@@ -38,6 +38,9 @@
 	/** Full profile list for the header quick-switcher dropdown — fetched once on mount. */
 	let profileList = $state<Profile[]>([]);
 	let profileListError = $state<string | undefined>();
+	/** Header quick-switcher dropdown open state. Forced true here for step-2 visual review only. */
+	let profileDropdownOpen = $state(true);
+	let profileSwitcherEl = $state<HTMLElement | undefined>();
 	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
 	let overlayNoProfile = $state(false);
 	/** Polling interval — how often a profile-agnostic overlay re-checks which profile it should show. */
@@ -342,7 +345,30 @@
 	{#if !overlayMode}
 		<header>
 			<h1>
-				All Chat {#if profileName} / <span class="profile-name">{profileName}</span>{/if}
+				All Chat {#if profileName} / <span class="profile-switcher" bind:this={profileSwitcherEl}>
+					<button
+						type="button"
+						class="profile-name profile-name-trigger"
+						aria-haspopup="menu"
+						aria-expanded={profileDropdownOpen}
+					>
+						{profileName} <span class="caret" aria-hidden="true">▾</span>
+					</button>
+					{#if profileDropdownOpen}
+						<div class="profile-dropdown" role="menu">
+							{#each profileList as p (p.id)}
+								<button type="button" role="menuitem" class="profile-option" class:active={p.id === profileId}>
+									{p.name}
+								</button>
+							{:else}
+								<p class="profile-dropdown-empty">No profiles yet.</p>
+							{/each}
+							{#if profileListError}
+								<p class="profile-dropdown-error">{profileListError}</p>
+							{/if}
+						</div>
+					{/if}
+				</span>{/if}
 				<span class="app-version">v{__APP_VERSION__}</span>
 			</h1>
 			<div class="controls">
@@ -693,6 +719,63 @@
 
 	.profile-name {
 		color: var(--text-muted);
+	}
+
+	.profile-switcher {
+		position: relative;
+		display: inline-block;
+	}
+
+	.profile-name-trigger {
+		background: none;
+		border: none;
+		padding: 0;
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.profile-name-trigger .caret {
+		font-size: 0.7em;
+	}
+
+	.profile-dropdown {
+		position: absolute;
+		top: calc(100% + 0.25rem);
+		left: 0;
+		z-index: 10;
+		min-width: 10rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.25rem;
+	}
+
+	.profile-option {
+		display: block;
+		width: 100%;
+		text-align: left;
+		background: none;
+		border: none;
+		padding: 0.35rem 0.5rem;
+		font: inherit;
+		color: var(--text);
+		cursor: pointer;
+	}
+
+	.profile-option.active {
+		color: var(--accent);
+	}
+
+	.profile-dropdown-empty,
+	.profile-dropdown-error {
+		margin: 0;
+		padding: 0.35rem 0.5rem;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+	}
+
+	.profile-dropdown-error {
+		color: var(--status-failed);
 	}
 
 	.app-version {
