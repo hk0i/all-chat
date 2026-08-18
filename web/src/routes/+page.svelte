@@ -291,6 +291,27 @@
 
 			checkPointer();
 			pointerPollHandle = setInterval(checkPointer, OVERLAY_POINTER_POLL_MS);
+		} else {
+			// Bare `/`: adopt the currently-active overlay profile (set via the
+			// ★ toggle on /profiles) as an implicit target, so a fresh default-route
+			// load reflects state already configured in this session.
+			fetch('/api/overlay-profile')
+				.then((response) => response.json())
+				.then((data: { profileId: string | null }) => {
+					if (!data.profileId) return;
+					return fetch(`/api/profiles/${encodeURIComponent(data.profileId)}`)
+						.then((response) => (response.ok ? (response.json() as Promise<Profile>) : null))
+						.then((profile) => {
+							if (!profile) return;
+							profileName = profile.name;
+							profileId = profile.id;
+							hasParams = true;
+							const target = new URLSearchParams(params);
+							target.set('profile', profile.id);
+							connectStream(target);
+						});
+				})
+				.catch(() => {});
 		}
 
 		return () => {
