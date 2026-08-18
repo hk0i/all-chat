@@ -8,6 +8,15 @@
 	import type { ChatSession } from '$lib/chat/session.svelte';
 	import type { Theme } from '$lib/theme';
 
+	interface Props {
+		session: ChatSession;
+		showIcons: boolean;
+		showAvatars: boolean;
+		showTimestamps: boolean;
+		theme: Theme;
+		overlay?: boolean;
+	}
+
 	let {
 		session,
 		showIcons,
@@ -15,14 +24,7 @@
 		showTimestamps,
 		theme,
 		overlay = false
-	}: {
-		session: ChatSession;
-		showIcons: boolean;
-		showAvatars: boolean;
-		showTimestamps: boolean;
-		theme: Theme;
-		overlay?: boolean;
-	} = $props();
+	}: Props = $props();
 
 	/**
 	 * Platforms with more than one live source in the current view — e.g. two

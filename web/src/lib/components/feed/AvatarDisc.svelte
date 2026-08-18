@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { ChatAuthor } from '@all-chat/contract';
 
-	let { author }: { author: ChatAuthor } = $props();
+	interface Props {
+		author: ChatAuthor;
+	}
+
+	let { author }: Props = $props();
 </script>
 
 {#if author.avatarUrl}

@@ -3,6 +3,20 @@
 	import { toggleTheme, type Theme } from '$lib/theme';
 	import type { Profile, StatusEvent } from '@all-chat/contract';
 
+	interface Props {
+		profileId: string | undefined;
+		profileName: string | undefined;
+		profileList: Profile[];
+		profileListError: string | undefined;
+		profileSwitchError: string | undefined;
+		onswitch: (target: Profile) => void;
+		statuses: Record<string, StatusEvent>;
+		showIcons: boolean;
+		showAvatars: boolean;
+		showTimestamps: boolean;
+		theme: Theme;
+	}
+
 	let {
 		profileId,
 		profileName,
@@ -15,19 +29,7 @@
 		showAvatars = $bindable(),
 		showTimestamps = $bindable(),
 		theme = $bindable()
-	}: {
-		profileId: string | undefined;
-		profileName: string | undefined;
-		profileList: Profile[];
-		profileListError: string | undefined;
-		profileSwitchError: string | undefined;
-		onswitch: (target: Profile) => void;
-		statuses: Record<string, StatusEvent>;
-		showIcons: boolean;
-		showAvatars: boolean;
-		showTimestamps: boolean;
-		theme: Theme;
-	} = $props();
+	}: Props = $props();
 </script>
 
 <header>

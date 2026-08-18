@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { Badge, BadgeKind } from '@all-chat/contract';
 
-	let { badges }: { badges: Badge[] } = $props();
+	interface Props {
+		badges: Badge[];
+	}
+
+	let { badges }: Props = $props();
 
 	/**
 	 * Short label per recognized kind. `unknown` covers platform badge sets

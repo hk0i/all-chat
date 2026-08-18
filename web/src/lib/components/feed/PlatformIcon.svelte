@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { Platform } from '@all-chat/contract';
 
-	let { platform }: { platform: Platform } = $props();
+	interface Props {
+		platform: Platform;
+	}
+
+	let { platform }: Props = $props();
 
 	/**
 	 * Brand glyph paths from Simple Icons (https://simpleicons.org, CC0),

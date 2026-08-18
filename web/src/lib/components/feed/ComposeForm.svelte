@@ -3,7 +3,12 @@
 	import type { ChatSession } from '$lib/chat/session.svelte';
 
 	/** Compose box (EDD-V2 §5) — one box out, mirroring the one unified feed in. Sends to every connected source in the active profile, no per-platform picking (explicitly descoped for now). */
-	let { session, profileId }: { session: ChatSession; profileId: string | undefined } = $props();
+	interface Props {
+		session: ChatSession;
+		profileId: string | undefined;
+	}
+
+	let { session, profileId }: Props = $props();
 
 	let composeText = $state('');
 

@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { Profile } from '@all-chat/contract';
 
+	interface Props {
+		profileId: string | undefined;
+		profileName: string;
+		profileList: Profile[];
+		profileListError: string | undefined;
+		profileSwitchError: string | undefined;
+		onswitch: (target: Profile) => void;
+	}
+
 	let {
 		profileId,
 		profileName,
@@ -8,14 +17,7 @@
 		profileListError,
 		profileSwitchError,
 		onswitch
-	}: {
-		profileId: string | undefined;
-		profileName: string;
-		profileList: Profile[];
-		profileListError: string | undefined;
-		profileSwitchError: string | undefined;
-		onswitch: (target: Profile) => void;
-	} = $props();
+	}: Props = $props();
 
 	let open = $state(false);
 	let el = $state<HTMLElement | undefined>();
