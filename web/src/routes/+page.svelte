@@ -38,8 +38,8 @@
 	/** Full profile list for the header quick-switcher dropdown — fetched once on mount. */
 	let profileList = $state<Profile[]>([]);
 	let profileListError = $state<string | undefined>();
-	/** Header quick-switcher dropdown open state. Forced true here for step-2 visual review only. */
-	let profileDropdownOpen = $state(true);
+	/** Header quick-switcher dropdown open state. */
+	let profileDropdownOpen = $state(false);
 	let profileSwitcherEl = $state<HTMLElement | undefined>();
 	/** Overlay mode with no explicit `profile=`/`source=`: true once we've checked the switchable pointer and it's unset. */
 	let overlayNoProfile = $state(false);
@@ -201,6 +201,25 @@
 		if (stickToBottom) scrollToBottom();
 	});
 
+	// Close the profile-switcher dropdown on an outside click or Escape.
+	$effect(() => {
+		if (!profileDropdownOpen) return;
+		function onDocClick(event: MouseEvent) {
+			if (profileSwitcherEl && !profileSwitcherEl.contains(event.target as Node)) {
+				profileDropdownOpen = false;
+			}
+		}
+		function onKeydown(event: KeyboardEvent) {
+			if (event.key === 'Escape') profileDropdownOpen = false;
+		}
+		document.addEventListener('click', onDocClick);
+		document.addEventListener('keydown', onKeydown);
+		return () => {
+			document.removeEventListener('click', onDocClick);
+			document.removeEventListener('keydown', onKeydown);
+		};
+	});
+
 	// Scaffold wiring: connect when the URL carries ?profile= or ?source= params.
 	onMount(() => {
 		theme = currentTheme();
@@ -351,6 +370,7 @@
 						class="profile-name profile-name-trigger"
 						aria-haspopup="menu"
 						aria-expanded={profileDropdownOpen}
+						onclick={() => (profileDropdownOpen = !profileDropdownOpen)}
 					>
 						{profileName} <span class="caret" aria-hidden="true">▾</span>
 					</button>
