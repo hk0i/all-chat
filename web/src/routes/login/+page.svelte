@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import type { PageProps } from './$types';
 
-	let { data } = $props();
+	let { data }: PageProps = $props();
 
 	let password = $state('');
 	let confirmPassword = $state('');

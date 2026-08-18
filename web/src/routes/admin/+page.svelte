@@ -2,8 +2,9 @@
 	import type { BearerTokenInfo, PlatformProviderStatus, Profile, UrlTokenInfo } from '@all-chat/contract';
 	import { copyToClipboard } from '$lib/clipboard';
 	import { toggleTheme } from '$lib/theme';
+	import type { PageProps } from './$types';
 
-	let { data } = $props();
+	let { data }: PageProps = $props();
 
 	// svelte-ignore state_referenced_locally
 	let bearerTokens = $state<BearerTokenInfo[]>(data.bearerTokens);

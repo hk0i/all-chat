@@ -3,8 +3,9 @@
 	import { page } from '$app/state';
 	import { copyToClipboard } from '$lib/clipboard';
 	import { toggleTheme } from '$lib/theme';
+	import type { PageProps } from './$types';
 
-	let { data } = $props();
+	let { data }: PageProps = $props();
 
 	/** Connections for a platform (EDD-V2 §3) — facebook sources pick one instead of typing a channel; other platforms pick one optionally, to send through (EDD-V2 §5). */
 	function connectionsFor(platform: Platform) {
