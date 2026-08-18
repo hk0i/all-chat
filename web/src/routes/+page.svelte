@@ -3,17 +3,15 @@
 	import { fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import type { ChatMessage, ChatSendResult, Profile, StatusEvent } from '@all-chat/contract';
+	import type { Profile } from '@all-chat/contract';
 	import AvatarDisc from '$lib/components/feed/AvatarDisc.svelte';
 	import BadgeStrip from '$lib/components/feed/BadgeStrip.svelte';
 	import PlatformIcon from '$lib/components/feed/PlatformIcon.svelte';
 	import ProfileSwitcher from '$lib/components/feed/ProfileSwitcher.svelte';
 	import { readableColor } from '$lib/colorContrast';
 	import { formatTimestamp } from '$lib/formatTime';
-	import { openChatStream } from '$lib/stream';
+	import { createChatSession } from '$lib/chat/session.svelte';
 	import { currentTheme, toggleTheme, type Theme } from '$lib/theme';
-
-	const MAX_MESSAGES = 1000;
 
 	/**
 	 * Default `fade` when overlay mode doesn't specify one — an overlay left
@@ -23,16 +21,10 @@
 	 */
 	const DEFAULT_OVERLAY_FADE_SECONDS = 10;
 
-	/** How close to the bottom (px) still counts as "at the bottom". */
-	const STICK_THRESHOLD_PX = 40;
+	const session = createChatSession();
 
-	let messages = $state<ChatMessage[]>([]);
-	let statuses = $state<Record<string, StatusEvent>>({});
-	let connected = $state(false);
 	/** Whether ?profile= or ?source= was passed at all — distinguishes "nothing to connect to" from a real failure below. */
 	let hasParams = $state(false);
-	/** Set when the stream connection fails permanently (see stream.ts onError). */
-	let streamError = $state<string | undefined>();
 	/** Display name of the connected profile (?profile=), for the header title — undefined for ad-hoc ?source= or before it resolves. */
 	let profileName = $state<string | undefined>();
 	/** The active profile's id — set whenever there's a real profile to send through (?profile= or the switchable overlay pointer); undefined for ad-hoc ?source= (no persisted sources to look up connections against). */
@@ -80,146 +72,26 @@
 	let overlayMode = $state(false);
 
 	/**
-	 * Seconds a message stays before it's evicted from the feed. Defaults on
-	 * in overlay mode (DEFAULT_OVERLAY_FADE_SECONDS), off otherwise; `&fade=N`
-	 * overrides either way, and `&fade=0` disables eviction even in overlay.
-	 */
-	let fadeSeconds = $state<number | undefined>();
-	/** message id → receipt time (ms); drives the fade-eviction sweep. */
-	const receivedAt = new Map<string, number>();
-	let fadeSweepHandle: ReturnType<typeof setInterval> | undefined;
-
-	/**
 	 * Platforms with more than one live source in the current view — e.g. two
 	 * Twitch channels in one profile. The platform icon alone can't tell them
 	 * apart, so those messages also get a channel tag (EDD §3).
 	 */
 	let duplicatePlatforms = $derived.by(() => {
 		const counts = new Map<string, number>();
-		for (const status of Object.values(statuses)) {
+		for (const status of Object.values(session.statuses)) {
 			counts.set(status.platform, (counts.get(status.platform) ?? 0) + 1);
 		}
 		return new Set([...counts].filter(([, count]) => count > 1).map(([platform]) => platform));
 	});
 
-	let feedElement = $state<HTMLUListElement | undefined>();
-	/** False once the user scrolls up; new messages then pause instead of yanking the view. */
-	let stickToBottom = $state(true);
-	let missedCount = $state(0);
-
-	/**
-	 * Incoming SSE messages land here first, not directly in `messages` —
-	 * a busy channel (10k+ msg/min, EDD §7) firing one Svelte state update
-	 * per message would re-render the list that often. Buffered and flushed
-	 * once per animation frame instead, so render rate tracks the display's
-	 * refresh rate, not the chat's.
-	 */
-	let messageBuffer: ChatMessage[] = [];
-	let flushHandle: number | undefined;
-
-	function scheduleFlush() {
-		if (flushHandle !== undefined) return;
-		flushHandle = requestAnimationFrame(flushMessages);
-	}
-
-	function flushMessages() {
-		flushHandle = undefined;
-		if (messageBuffer.length === 0) return;
-		const incoming = messageBuffer;
-		messageBuffer = [];
-		const now = Date.now();
-		for (const message of incoming) receivedAt.set(message.id, now);
-		messages = [...messages, ...incoming].slice(-MAX_MESSAGES);
-		if (!stickToBottom) missedCount += incoming.length;
-	}
-
-	/** Evicts messages older than `fadeSeconds`; the `out:fade` transition animates their removal. */
-	function sweepExpired() {
-		if (fadeSeconds === undefined) return;
-		const cutoff = Date.now() - fadeSeconds * 1000;
-		const next = messages.filter((message) => (receivedAt.get(message.id) ?? 0) > cutoff);
-		if (next.length === messages.length) return;
-		messages = next;
-		const keep = new Set(next.map((message) => message.id));
-		for (const id of receivedAt.keys()) if (!keep.has(id)) receivedAt.delete(id);
-	}
-
-	function onFeedScroll() {
-		if (!feedElement) return;
-		const distanceFromBottom =
-			feedElement.scrollHeight - feedElement.scrollTop - feedElement.clientHeight;
-		const atBottom = distanceFromBottom <= STICK_THRESHOLD_PX;
-		if (atBottom && !stickToBottom) missedCount = 0;
-		stickToBottom = atBottom;
-	}
-
-	function resumeScroll() {
-		stickToBottom = true;
-		missedCount = 0;
-		scrollToBottom();
-	}
-
-	function scrollToBottom() {
-		if (feedElement) feedElement.scrollTop = feedElement.scrollHeight;
-	}
-
 	/** Compose box (EDD-V2 §5) — one box out, mirroring the one unified feed in. Sends to every connected source in the active profile, no per-platform picking (explicitly descoped for now). */
 	let composeText = $state('');
-	let sending = $state(false);
-	let sendResults = $state<ChatSendResult[] | undefined>();
-	let sendError = $state<string | undefined>();
 
 	async function sendMessage() {
 		const text = composeText.trim();
-		if (!text || !profileId || sending) return;
-		sending = true;
-		sendResults = undefined;
-		sendError = undefined;
-		try {
-			const response = await fetch('/api/chat/send', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ profileId, text })
-			});
-			if (!response.ok) {
-				sendError = ((await response.json()) as { message?: string }).message ?? response.statusText;
-				return;
-			}
-			const body = (await response.json()) as { results: ChatSendResult[] };
-			sendResults = body.results;
-			composeText = '';
-		} catch (cause) {
-			sendError = (cause as Error).message;
-		} finally {
-			sending = false;
-		}
-	}
-
-	// Keep pinned to the newest message unless the user scrolled up.
-	$effect(() => {
-		void messages.length;
-		if (stickToBottom) scrollToBottom();
-	});
-
-
-	let closeStream: (() => void) | undefined;
-
-	function connectStream(streamParams: URLSearchParams) {
-		closeStream?.();
-		closeStream = openChatStream(streamParams.toString(), {
-			onHello: () => (connected = true),
-			onMessage: (message) => {
-				messageBuffer.push(message);
-				scheduleFlush();
-			},
-			onStatus: (status) => {
-				statuses = { ...statuses, [status.sourceId]: status };
-			},
-			onError: (message) => {
-				connected = false;
-				streamError = message;
-			}
-		});
+		if (!text || !profileId || session.sending) return;
+		await session.sendMessage(text, profileId);
+		if (!session.sendError) composeText = '';
 	}
 
 	/** Header dropdown selection: switches the local view and best-effort repoints the overlay pointer, mirroring the /profiles "watch" link + ★ toggle. */
@@ -227,12 +99,7 @@
 		if (target.id === profileId) return;
 		profileSwitchError = undefined;
 
-		messages = [];
-		statuses = {};
-		connected = false;
-		streamError = undefined;
-		messageBuffer = [];
-		receivedAt.clear();
+		session.resetMessages();
 
 		profileName = target.name;
 		profileId = target.id;
@@ -241,7 +108,7 @@
 
 		const nextParams = new URLSearchParams(page.url.searchParams);
 		nextParams.set('profile', target.id);
-		connectStream(nextParams);
+		session.connectStream(nextParams);
 		goto(`/?${nextParams.toString()}`, { replaceState: true, noScroll: true, keepFocus: true });
 
 		try {
@@ -280,13 +147,14 @@
 			? params.get('timestamps') !== '0'
 			: params.get('overlay') !== '1';
 
+		let fadeSeconds: number | undefined;
 		if (params.has('fade')) {
 			const fadeParam = Number(params.get('fade'));
 			if (Number.isFinite(fadeParam) && fadeParam > 0) fadeSeconds = fadeParam;
 		} else if (overlayMode) {
 			fadeSeconds = DEFAULT_OVERLAY_FADE_SECONDS;
 		}
-		if (fadeSeconds !== undefined) fadeSweepHandle = setInterval(sweepExpired, 1000);
+		session.startFadeSweep(fadeSeconds);
 
 		const explicitTarget = params.has('profile') || params.has('source');
 		hasParams = explicitTarget;
@@ -294,7 +162,7 @@
 		let pointerPollHandle: ReturnType<typeof setInterval> | undefined;
 
 		if (explicitTarget) {
-			connectStream(params);
+			session.connectStream(params);
 			const profileParam = params.get('profile');
 			if (profileParam) {
 				fetch(`/api/profiles/${encodeURIComponent(profileParam)}`)
@@ -320,18 +188,12 @@
 				activeProfileId = pointerProfileId;
 				profileId = pointerProfileId ?? undefined;
 				overlayNoProfile = !pointerProfileId;
-				closeStream?.();
-				closeStream = undefined;
-				messages = [];
-				statuses = {};
-				connected = false;
-				streamError = undefined;
-				messageBuffer = [];
-				receivedAt.clear();
+				session.closeStream();
+				session.resetMessages();
 				if (!pointerProfileId) return;
 				const target = new URLSearchParams(params);
 				target.set('profile', pointerProfileId);
-				connectStream(target);
+				session.connectStream(target);
 			};
 
 			const checkPointer = () =>
@@ -359,16 +221,14 @@
 							hasParams = true;
 							const target = new URLSearchParams(params);
 							target.set('profile', profile.id);
-							connectStream(target);
+							session.connectStream(target);
 						});
 				})
 				.catch(() => {});
 		}
 
 		return () => {
-			closeStream?.();
-			if (flushHandle !== undefined) cancelAnimationFrame(flushHandle);
-			if (fadeSweepHandle !== undefined) clearInterval(fadeSweepHandle);
+			session.dispose();
 			if (pointerPollHandle !== undefined) clearInterval(pointerPollHandle);
 		};
 	});
@@ -395,7 +255,7 @@
 				<span class="app-version">v{__APP_VERSION__}</span>
 			</h1>
 			<div class="controls">
-				{#each Object.values(statuses) as status (status.sourceId)}
+				{#each Object.values(session.statuses) as status (status.sourceId)}
 					<span class="status status-{status.state}" title="{status.platform}/{status.channel}: {status.state}"></span>
 				{/each}
 				<a class="nav" href="/profiles">profiles</a>
@@ -408,8 +268,8 @@
 		</header>
 	{/if}
 
-	{#if streamError}
-		<p class="error-banner" role="alert">Couldn't connect: {streamError}</p>
+	{#if session.streamError}
+		<p class="error-banner" role="alert">Couldn't connect: {session.streamError}</p>
 	{:else if overlayMode && overlayNoProfile}
 		<p class="hint">
 			No overlay profile selected — pick one from <a href="/profiles">Profiles</a>.
@@ -422,12 +282,12 @@
 	{/if}
 
 	<div class="feed-wrap">
-		<ul class="feed" bind:this={feedElement} onscroll={onFeedScroll}>
-			{#each messages as message (message.id)}
+		<ul class="feed" bind:this={session.feedElement} onscroll={session.onFeedScroll}>
+			{#each session.messages as message (message.id)}
 			{@const messageDate = new Date(message.timestamp)}
 			<li
 				class={showIcons ? `striped platform-${message.platform}` : undefined}
-				out:fade={fadeSeconds !== undefined ? { duration: 400 } : { duration: 0 }}
+				out:fade={session.fadeSeconds !== undefined ? { duration: 400 } : { duration: 0 }}
 			>
 				{#if showTimestamps}<time class="timestamp" datetime={messageDate.toISOString()}
 						>{formatTimestamp(messageDate)}</time
@@ -457,9 +317,11 @@
 			</li>
 			{/each}
 		</ul>
-		{#if !stickToBottom}
-			<button class="resume-pill" onclick={resumeScroll}>
-				paused{missedCount > 0 ? ` — ${missedCount} new message${missedCount === 1 ? '' : 's'}` : ''} ↓
+		{#if !session.stickToBottom}
+			<button class="resume-pill" onclick={session.resumeScroll}>
+				paused{session.missedCount > 0
+					? ` — ${session.missedCount} new message${session.missedCount === 1 ? '' : 's'}`
+					: ''} ↓
 			</button>
 		{/if}
 	</div>
@@ -469,20 +331,20 @@
 			<input
 				bind:value={composeText}
 				placeholder="Send a message to every connected platform…"
-				disabled={sending}
+				disabled={session.sending}
 			/>
-			<button class="primary" type="submit" disabled={sending || !composeText.trim()}>
-				{sending ? 'sending…' : 'send'}
+			<button class="primary" type="submit" disabled={session.sending || !composeText.trim()}>
+				{session.sending ? 'sending…' : 'send'}
 			</button>
 		</form>
-		{#if sendError}
-			<p class="error-banner" role="alert">{sendError}</p>
-		{:else if sendResults}
-			{#if sendResults.length === 0}
+		{#if session.sendError}
+			<p class="error-banner" role="alert">{session.sendError}</p>
+		{:else if session.sendResults}
+			{#if session.sendResults.length === 0}
 				<p class="hint">No connected accounts to send through — connect one in admin first.</p>
 			{:else}
 				<p class="send-results">
-					{#each sendResults as result (result.sourceId)}
+					{#each session.sendResults as result (result.sourceId)}
 						<span class="send-result" class:failed={!result.ok} title={result.error}>
 							<PlatformIcon platform={result.platform} />{result.ok ? 'sent' : result.error}
 						</span>
