@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | Complete |
 | **Date** | 2026-08-18 |
 | **Scope** | Split `routes/+page.svelte` into dock (`/`) and overlay (`/overlay`) routes, with shared chat-session logic and extracted presentational components |
 | **Author** | Gregory McQuillan |
