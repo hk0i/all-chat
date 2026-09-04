@@ -21,6 +21,7 @@ All notable changes to this project are documented here.
 - Message `Date` built once and shared between `datetime` attribute and `formatTimestamp` (single source of truth).
 - `connectStream`/`closeStream` hoisted out of `onMount` to component scope.
 - EDDs renamed to `<date>-<name>.edd.md` and cross-references updated for clearer history when browsing.
+- Dock header: icons/avatars/timestamps/theme toggles collapsed into a single options popover (`DisplayOptionsMenu.svelte`), trigger collapses to a gear icon at narrow widths — more room for small OBS dock sizes.
 
 ### Fixed
 - EDD markdown headers now render as tables instead of clumped paragraphs.
