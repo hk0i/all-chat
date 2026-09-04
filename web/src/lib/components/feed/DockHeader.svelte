@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProfileSwitcher from '$lib/components/feed/ProfileSwitcher.svelte';
-	import { toggleTheme, type Theme } from '$lib/theme';
+	import DisplayOptionsMenu from '$lib/components/feed/DisplayOptionsMenu.svelte';
+	import type { Theme } from '$lib/theme';
 	import type { Profile, StatusEvent } from '@all-chat/contract';
 
 	interface Props {
@@ -52,10 +53,7 @@
 		{/each}
 		<a class="nav" href="/profiles">profiles</a>
 		<a class="nav" href="/admin">admin</a>
-		<button class:off={!showIcons} onclick={() => (showIcons = !showIcons)}>icons</button>
-		<button class:off={!showAvatars} onclick={() => (showAvatars = !showAvatars)}>avatars</button>
-		<button class:off={!showTimestamps} onclick={() => (showTimestamps = !showTimestamps)}>time</button>
-		<button onclick={() => (theme = toggleTheme())}>theme</button>
+		<DisplayOptionsMenu bind:showIcons bind:showAvatars bind:showTimestamps bind:theme />
 	</div>
 </header>
 
@@ -107,10 +105,6 @@
 
 	.nav:hover {
 		color: var(--accent);
-	}
-
-	button.off {
-		opacity: 0.5;
 	}
 
 	.app-version {
