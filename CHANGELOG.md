@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
 - Version number surfaced in header for end users.
 - Release script (`scripts/release.sh`) to bump versions across workspaces, commit, and tag — with regex support for prerelease suffixes (`-beta.1`, `-RC.1`, etc).
 - Basic error logging to console (manager).
+- App favicon: chat-bubble icon in dark-theme accent colors (`web/static/favicon.svg`).
 
 ### Changed
 - Bare `/` route now adopts the active overlay profile as implicit target.
@@ -25,6 +26,7 @@ All notable changes to this project are documented here.
 
 ### Fixed
 - EDD markdown headers now render as tables instead of clumped paragraphs.
+- Removed leftover SvelteKit starter-template favicon link (`+layout.svelte`) that was overriding the new app icon.
 
 ### Docs
 - v2 EDD first draft, with sections on the Facebook app-review multiplier problem, HTTPS redirects from the OAuth flow, and forward-looking notes on native mobile client discovery over mDNS/LAN.
