@@ -10,10 +10,12 @@ services:
     environment:
       VIRTUAL_HOST: ${ALLCHAT_HOST:-all-chat.localhost}
       VIRTUAL_PORT: "3000"
-      # Kick rotates its public Pusher key occasionally; override without a
-      # code change (see docs/EDD.md §3.2). Empty = use built-in defaults.
+      # Kick's Pusher key is auto-fetched from kick.com. These are an optional
+      # first guess (HOST only applies with KEY); empty = fully automatic.
       KICK_PUSHER_KEY: ${KICK_PUSHER_KEY:-}
       KICK_PUSHER_HOST: ${KICK_PUSHER_HOST:-}
+      # Optional Discord webhook for operational alerts; treat the URL as a secret.
+      ALERT_DISCORD_WEBHOOK_URL: ${ALERT_DISCORD_WEBHOOK_URL:-}
       # Platform OAuth (docs/EDD-V2.md §3) — connecting Twitch/YouTube unlocks
       # sending messages through them; reading works anonymously without these.
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
