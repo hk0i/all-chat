@@ -6,9 +6,8 @@
  * connect time and only falls back to the constants below.
  */
 
-/** Channel metadata lookup — returns `chatroom.id` among other fields. Behind Cloudflare. */
-export const KICK_CHANNEL_API = (slug: string) =>
-	`https://kick.com/api/v2/channels/${encodeURIComponent(slug)}`;
+/** Defined in `kickChannel.ts` because the profiles page also calls it from the browser. */
+export { KICK_CHANNEL_API } from '../../../kickChannel';
 
 /** Asks Kick which realtime provider and credentials its web client should use. */
 export const KICK_REALTIME_CONNECTION_API = 'https://web.kick.com/api/v1/realtime/connection';

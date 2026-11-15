@@ -16,6 +16,7 @@ All notable changes to this project are documented here.
 - App favicon: chat-bubble icon in dark-theme accent colors (`web/static/favicon.svg`).
 - Kick's Pusher key is fetched from kick.com at connect time; `KICK_PUSHER_KEY` is now an optional first guess.
 - Optional Discord webhook alerts for Kick chat-key problems (`ALERT_DISCORD_WEBHOOK_URL`).
+- Profiles page resolves a Kick username or `kick.com` link to its chatroom id in the browser.
 
 ### Changed
 - Bare `/` route now adopts the active overlay profile as implicit target.

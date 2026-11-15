@@ -5,9 +5,11 @@ import { KICK_CHANNEL_API } from './constants';
  * API. Results are cached for the process lifetime — chatroom ids are
  * stable per channel.
  *
- * The endpoint sits behind Cloudflare and may reject non-browser clients
- * (especially from datacenter IPs); callers surface that as a prompt for
- * manual chatroom-id entry (EDD §3.2).
+ * The endpoint sits behind Cloudflare, which refuses Node's fetch by client
+ * fingerprint from any network. The profiles page resolves usernames in the
+ * browser instead (`kickChannel.ts`); this lookup remains for sources saved
+ * with a raw slug, and callers surface a block as a prompt for manual
+ * chatroom-id entry (EDD §3.2).
  */
 
 const cache = new Map<string, number>();

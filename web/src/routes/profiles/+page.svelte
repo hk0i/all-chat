@@ -2,6 +2,7 @@
 	import type { Platform, Profile } from '@all-chat/contract';
 	import { page } from '$app/state';
 	import { copyToClipboard } from '$lib/clipboard';
+	import { KickChannelError, parseKickChannel, resolveKickChatroom } from '$lib/kickChannel';
 	import { toggleTheme } from '$lib/theme';
 	import type { PageProps } from './$types';
 
@@ -59,10 +60,73 @@
 
 	const CHANNEL_PLACEHOLDER: Record<Platform, string> = {
 		twitch: 'channel name',
-		kick: 'chatroom id (or channel slug)',
+		kick: 'username, kick.com URL, or chatroom id',
 		youtube: '@handle, video URL, or video id',
 		facebook: '' // unused — facebook picks a connected Page from a dropdown, not free text
 	};
+
+	type KickLookup =
+		| { state: 'resolving'; slug: string }
+		| { state: 'resolved'; slug: string; chatroomId: number }
+		| { state: 'failed'; message: string };
+
+	const KICK_INPUT_INVALID =
+		'Not a Kick username or channel URL. Enter a username, a kick.com link, or the chatroom id.';
+
+	/** Keyed by DraftSource.key so status follows the row through reorders. */
+	let kickLookups = $state<Record<string, KickLookup>>({});
+
+	const kickResolving = $derived(Object.values(kickLookups).some((lookup) => lookup.state === 'resolving'));
+
+	async function resolveKickChannel(source: DraftSource) {
+		if (source.platform !== 'kick') {
+			return;
+		}
+		const typed = source.channel;
+		const input = parseKickChannel(typed);
+		if (input.kind === 'empty') {
+			delete kickLookups[source.key];
+			return;
+		}
+		if (input.kind === 'chatroomId') {
+			const shown = kickLookups[source.key];
+			if (shown?.state !== 'resolved' || String(shown.chatroomId) !== typed.trim()) {
+				// A hand-typed id owes nothing to an earlier lookup's status line.
+				delete kickLookups[source.key];
+			}
+			return;
+		}
+		if (input.kind === 'invalid') {
+			kickLookups[source.key] = { state: 'failed', message: KICK_INPUT_INVALID };
+			return;
+		}
+
+		const { slug } = input;
+		kickLookups[source.key] = { state: 'resolving', slug };
+		let outcome: KickLookup;
+		try {
+			outcome = { state: 'resolved', slug, chatroomId: await resolveKickChatroom(slug) };
+		} catch (cause) {
+			const message = cause instanceof KickChannelError ? cause.message : String(cause);
+			outcome = { state: 'failed', message };
+		}
+
+		if (source.channel !== typed) {
+			// Edited mid-lookup: the newer text wins, and only a status this lookup still owns is cleared.
+			const shown = kickLookups[source.key];
+			if (shown?.state === 'resolving' && shown.slug === slug) {
+				delete kickLookups[source.key];
+			}
+			return;
+		}
+		if (outcome.state === 'resolved') {
+			source.channel = String(outcome.chatroomId);
+			if (!source.label.trim()) {
+				source.label = slug;
+			}
+		}
+		kickLookups[source.key] = outcome;
+	}
 
 	/** Facebook has no channel to type — picking a Page sets both channel (display) and connectionId (lookup key) together. */
 	function selectFacebookPage(source: DraftSource, connectionId: string) {
@@ -340,6 +404,8 @@
 							class="channel"
 							bind:value={source.channel}
 							placeholder={CHANNEL_PLACEHOLDER[source.platform]}
+							aria-invalid={source.platform === 'kick' && kickLookups[source.key]?.state === 'failed'}
+							onblur={() => resolveKickChannel(source)}
 						/>
 						{#if connectionsFor(source.platform).length > 0}
 							<select
@@ -367,6 +433,14 @@
 					<button class="danger" aria-label="remove source" onclick={() => removeSource(index)}
 						>✕</button
 					>
+					{#if source.platform === 'kick' && kickLookups[source.key]}
+						{@const lookup = kickLookups[source.key]}
+						<p class="source-status" class:failed={lookup.state === 'failed'} aria-live="polite">
+							{#if lookup.state === 'resolving'}looking up {lookup.slug}…
+							{:else if lookup.state === 'resolved'}✓ {lookup.slug} → chatroom {lookup.chatroomId}
+							{:else}✕ {lookup.message}{/if}
+						</p>
+					{/if}
 				</div>
 			{:else}
 				<p class="empty">No sources — the feed will be empty until you add one.</p>
@@ -374,7 +448,7 @@
 			<button onclick={addSource}>+ add source</button>
 
 			<div class="actions">
-				<button class="primary" disabled={saving || !draft.name.trim()} onclick={save}>
+				<button class="primary" disabled={saving || kickResolving || !draft.name.trim()} onclick={save}>
 					{saving ? 'saving…' : 'save'}
 				</button>
 				<button onclick={() => (draft = undefined)}>cancel</button>
@@ -554,11 +628,27 @@
 		display: flex;
 		gap: 0.4rem;
 		align-items: center;
+		flex-wrap: wrap;
 	}
 
 	.source-row .channel {
 		flex: 2;
 		min-width: 0;
+	}
+
+	.source-row .channel[aria-invalid='true'] {
+		border-color: var(--status-failed);
+	}
+
+	.source-status {
+		flex-basis: 100%;
+		margin: 0;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+	}
+
+	.source-status.failed {
+		color: var(--status-failed);
 	}
 
 	.source-row .channel.hint {
